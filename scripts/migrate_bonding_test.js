@@ -88,6 +88,10 @@ async function main() {
     [Buffer.from("buyback_token_vault"), poolPda.toBuffer()],
     program.programId
   );
+  const [lpCustodyPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("lp_custody"), poolPda.toBuffer()],
+    program.programId
+  );
 
   const positionNftMint = Keypair.generate();
   const positionNftAccount = derivePositionNftAccount(positionNftMint.publicKey);
@@ -134,6 +138,7 @@ async function main() {
   console.log("Token vault amount:", tokenVaultBefore.amount.toString());
   console.log("Payer WSOL account:", payerWsolAccount.address.toBase58());
   console.log("Payer token account:", payerTokenAccount.address.toBase58());
+  console.log("LP custody PDA:", lpCustodyPda.toBase58());
   console.log("Position NFT mint:", positionNftMint.publicKey.toBase58());
 
   const signature = await program.methods
@@ -153,6 +158,7 @@ async function main() {
       meteoraPoolAuthority,
       token2022Program: TOKEN_2022_PROGRAM_ID,
       meteoraEventAuthority: EVENT_AUTHORITY,
+      lpCustody: lpCustodyPda,
       positionNftMint: positionNftMint.publicKey,
       positionNftAccount,
       positionAccount,

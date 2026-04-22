@@ -14,6 +14,9 @@ pub struct InitializeParams {
     pub sell_tax_bps: u16,
     pub presale_platform_fee_bps: u16,
     pub migration_fee_bps: u16,
+    pub creator_fee_bps: u16,
+    pub protocol_fee_bps: u16,
+    pub keeper_fee_bps: u16,
 }
 
 #[derive(Accounts)]
@@ -51,6 +54,14 @@ pub fn handle_initialize(ctx: Context<Initialize>, params: InitializeParams) -> 
         params.presale_platform_fee_bps <= 500, // max 5%
         LaunchpadError::InvalidFeeConfig
     );
+    require!(
+        protocol_fee_split_is_valid(
+            params.creator_fee_bps,
+            params.protocol_fee_bps,
+            params.keeper_fee_bps,
+        ),
+        LaunchpadError::InvalidFeeConfig
+    );
 
     let config = &mut ctx.accounts.config;
     config.admin = ctx.accounts.admin.key();
@@ -62,6 +73,9 @@ pub fn handle_initialize(ctx: Context<Initialize>, params: InitializeParams) -> 
     config.sell_tax_bps = params.sell_tax_bps;
     config.presale_platform_fee_bps = params.presale_platform_fee_bps;
     config.migration_fee_bps = params.migration_fee_bps;
+    config.creator_fee_bps = params.creator_fee_bps;
+    config.protocol_fee_bps = params.protocol_fee_bps;
+    config.keeper_fee_bps = params.keeper_fee_bps;
     config.pending_admin = Pubkey::default();
     config.is_paused = false;
     config.bump = ctx.bumps.config;
@@ -72,4 +86,25 @@ pub fn handle_initialize(ctx: Context<Initialize>, params: InitializeParams) -> 
     });
 
     Ok(())
+}
+
+pub fn protocol_fee_split_is_valid(
+    creator_fee_bps: u16,
+    protocol_fee_bps: u16,
+    keeper_fee_bps: u16,
+) -> bool {
+    (creator_fee_bps as u32) + (protocol_fee_bps as u32) + (keeper_fee_bps as u32) == 10_000
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn protocol_fee_split_must_sum_to_100_percent() {
+        assert!(protocol_fee_split_is_valid(7000, 2950, 50));
+        assert!(protocol_fee_split_is_valid(7000, 3000, 0));
+        assert!(!protocol_fee_split_is_valid(7000, 2999, 0));
+        assert!(!protocol_fee_split_is_valid(10_000, 1, 0));
+    }
 }

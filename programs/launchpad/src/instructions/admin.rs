@@ -16,6 +16,9 @@ pub struct UpdateConfigParams {
     pub new_sell_tax_bps: Option<u16>,
     pub new_presale_platform_fee_bps: Option<u16>,
     pub new_migration_fee_bps: Option<u16>,
+    pub new_creator_fee_bps: Option<u16>,
+    pub new_protocol_fee_bps: Option<u16>,
+    pub new_keeper_fee_bps: Option<u16>,
 }
 
 #[derive(Accounts)]
@@ -65,6 +68,18 @@ pub fn handle_update_config(ctx: Context<UpdateConfig>, params: UpdateConfigPara
         require!(v <= 500, LaunchpadError::InvalidFeeConfig);
         config.migration_fee_bps = v;
     }
+    let creator_fee_bps = params.new_creator_fee_bps.unwrap_or(config.creator_fee_bps);
+    let protocol_fee_bps = params
+        .new_protocol_fee_bps
+        .unwrap_or(config.protocol_fee_bps);
+    let keeper_fee_bps = params.new_keeper_fee_bps.unwrap_or(config.keeper_fee_bps);
+    require!(
+        (creator_fee_bps as u32) + (protocol_fee_bps as u32) + (keeper_fee_bps as u32) == 10_000,
+        LaunchpadError::InvalidFeeConfig
+    );
+    config.creator_fee_bps = creator_fee_bps;
+    config.protocol_fee_bps = protocol_fee_bps;
+    config.keeper_fee_bps = keeper_fee_bps;
 
     emit!(ConfigUpdated {
         admin: ctx.accounts.admin.key(),

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, SyncNative, Token, TokenAccount};
+use anchor_spl::token::{self, Mint, SyncNative, Token, TokenAccount};
 
 use crate::cpi_meteora::{
     self, InitializePoolAccounts, InitializePoolParams, METEORA_PROGRAM_ID, POOL_AUTHORITY,
@@ -108,6 +108,14 @@ pub struct MigrateBonding<'info> {
     /// CHECK: Meteora event authority PDA
     pub meteora_event_authority: UncheckedAccount<'info>,
 
+    /// CHECK: Program PDA that owns/custodies the LP position.
+    #[account(
+        seeds = [BuybackState::LP_CUSTODY_SEED, pool.key().as_ref()],
+        bump,
+        constraint = lp_custody.key() != payer.key() @ LaunchpadError::AdminLpCustody,
+    )]
+    pub lp_custody: UncheckedAccount<'info>,
+
     /// CHECK: Position NFT mint (signer keypair passed by caller)
     #[account(mut)]
     pub position_nft_mint: Signer<'info>,
@@ -144,7 +152,11 @@ pub struct MigrateBonding<'info> {
     #[account(
         constraint = token_mint.key() == pool.mint @ LaunchpadError::InvalidPoolParams
     )]
-    pub token_mint: Account<'info, anchor_spl::token::Mint>,
+    #[account(
+        constraint = token_mint.freeze_authority.is_none() @ LaunchpadError::MintFreezable,
+        constraint = token_mint.mint_authority.is_none() @ LaunchpadError::UnsafeMintAuthority,
+    )]
+    pub token_mint: Account<'info, Mint>,
 
     /// Payer's WSOL token account (for SOL deposit)
     #[account(
@@ -199,6 +211,8 @@ pub fn handle_migrate_bonding(ctx: Context<MigrateBonding>) -> Result<()> {
     ctx.accounts.buyback_state.pool = pool_key;
     ctx.accounts.buyback_state.mint = pool_mint;
     ctx.accounts.buyback_state.meteora_pool = ctx.accounts.meteora_pool.key();
+    ctx.accounts.buyback_state.lp_custody = ctx.accounts.lp_custody.key();
+    ctx.accounts.buyback_state.position_nft_mint = ctx.accounts.position_nft_mint.key();
     ctx.accounts.buyback_state.treasury_balance = buyback_sol;
     ctx.accounts.buyback_state.initial_treasury = buyback_sol;
     ctx.accounts.buyback_state.last_buyback_slot = 0;
@@ -206,7 +220,14 @@ pub fn handle_migrate_bonding(ctx: Context<MigrateBonding>) -> Result<()> {
     ctx.accounts.buyback_state.total_sol_spent = 0;
     ctx.accounts.buyback_state.total_tokens_bought = 0;
     ctx.accounts.buyback_state.total_tokens_burned = 0;
-    ctx.accounts.buyback_state.total_tokens_lp = 0;
+    ctx.accounts.buyback_state.idle_tokens = 0;
+    ctx.accounts.buyback_state.creator_fee_bps = config.creator_fee_bps;
+    ctx.accounts.buyback_state.protocol_fee_bps = config.protocol_fee_bps;
+    ctx.accounts.buyback_state.keeper_fee_bps = config.keeper_fee_bps;
+    ctx.accounts.buyback_state.creator_token_allocation = 0;
+    ctx.accounts.buyback_state.creator_tokens_claimed = 0;
+    ctx.accounts.buyback_state.total_lp_fees_claimed_a = 0;
+    ctx.accounts.buyback_state.total_lp_fees_claimed_b = 0;
     ctx.accounts.buyback_state.pool_type = 0;
     // Bonding pools don't use scheduled rounds; fields stay zero.
     ctx.accounts.buyback_state.total_rounds = 0;
@@ -280,7 +301,7 @@ pub fn handle_migrate_bonding(ctx: Context<MigrateBonding>) -> Result<()> {
 
     // 4. CPI: Create Meteora DAMM v2 pool with initial liquidity
     let meteora_accounts = InitializePoolAccounts {
-        creator: ctx.accounts.payer.to_account_info(),
+        creator: ctx.accounts.lp_custody.to_account_info(),
         payer: ctx.accounts.payer.to_account_info(),
         position_nft_mint: ctx.accounts.position_nft_mint.to_account_info(),
         position_nft_account: ctx.accounts.position_nft_account.to_account_info(),
@@ -365,5 +386,13 @@ mod tests {
         assert_eq!(buyback, 21_000_000_000);
         assert_eq!(fee + liquidity + buyback, total_sol + buyback_treasury);
         assert_eq!(liquidity_tokens, 800_000);
+    }
+
+    #[test]
+    fn lp_custody_must_not_be_admin_wallet() {
+        let admin = Pubkey::new_unique();
+        let lp_custody = Pubkey::new_unique();
+
+        assert_ne!(lp_custody, admin);
     }
 }

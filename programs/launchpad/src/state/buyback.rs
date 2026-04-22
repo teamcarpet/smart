@@ -5,8 +5,6 @@ use anchor_lang::prelude::*;
 pub enum BuybackMode {
     /// Swap SOL → token, then burn tokens (deflationary)
     Burn,
-    /// Swap SOL → token, add as LP to Meteora pool
-    AddLiquidity,
 }
 
 #[account]
@@ -18,6 +16,10 @@ pub struct BuybackState {
     pub mint: Pubkey,
     /// Meteora DAMM pool created during migration — validated on every buyback
     pub meteora_pool: Pubkey,
+    /// Program PDA that owns/custodies the LP position.
+    pub lp_custody: Pubkey,
+    /// Meteora position NFT mint for the principal LP position.
+    pub position_nft_mint: Pubkey,
 
     /// SOL remaining in buyback treasury (lamports)
     pub treasury_balance: u64,
@@ -36,8 +38,23 @@ pub struct BuybackState {
     pub total_tokens_bought: u64,
     /// Total tokens burned
     pub total_tokens_burned: u64,
-    /// Total tokens added as liquidity
-    pub total_tokens_lp: u64,
+    /// Explicit idle token accounting. Must remain zero for burn-only buybacks.
+    pub idle_tokens: u64,
+
+    /// Creator share of claimed LP fees in basis points.
+    pub creator_fee_bps: u16,
+    /// Protocol share of claimed LP fees in basis points.
+    pub protocol_fee_bps: u16,
+    /// Keeper reward share of claimed LP fees in basis points.
+    pub keeper_fee_bps: u16,
+    /// Creator token allocation claimable from the presale vault.
+    pub creator_token_allocation: u64,
+    /// Creator tokens already claimed.
+    pub creator_tokens_claimed: u64,
+    /// Total token-A LP fees distributed.
+    pub total_lp_fees_claimed_a: u64,
+    /// Total token-B LP fees distributed.
+    pub total_lp_fees_claimed_b: u64,
 
     /// Pool type (0 = bonding, 1 = presale)
     pub pool_type: u8,
@@ -58,6 +75,8 @@ pub struct BuybackState {
 
 impl BuybackState {
     pub const SEED: &'static [u8] = b"buyback";
+    pub const LP_CUSTODY_SEED: &'static [u8] = b"lp_custody";
+    pub const LP_FEE_VAULT_SEED: &'static [u8] = b"lp_fee_vault";
 
     /// Minimum slots between buybacks for BONDING pools (~4 seconds).
     /// Presale uses `round_interval_seconds` instead.

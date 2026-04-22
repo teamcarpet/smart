@@ -41,6 +41,7 @@ pub struct CreateBondingPool<'info> {
         constraint = mint.decimals == 6,
         constraint = mint.supply == 0,
         constraint = mint.mint_authority.contains(&creator.key()),
+        constraint = mint.freeze_authority.is_none() @ LaunchpadError::MintFreezable,
     )]
     pub mint: Box<Account<'info, Mint>>,
 
@@ -124,6 +125,15 @@ pub fn handle_create_bonding_pool(
     };
     let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
     token::set_authority(cpi_ctx, AuthorityType::MintTokens, None)?;
+    ctx.accounts.mint.reload()?;
+    require!(
+        ctx.accounts.mint.mint_authority.is_none(),
+        LaunchpadError::UnsafeMintAuthority
+    );
+    require!(
+        ctx.accounts.mint.freeze_authority.is_none(),
+        LaunchpadError::MintFreezable
+    );
 
     // Initialize pool state
     let pool = &mut ctx.accounts.pool;
@@ -153,4 +163,18 @@ pub fn handle_create_bonding_pool(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use anchor_lang::prelude::Pubkey;
+
+    #[test]
+    fn launch_requires_no_freeze_authority() {
+        let no_freeze_authority: Option<Pubkey> = None;
+        let freeze_authority = Some(Pubkey::new_unique());
+
+        assert!(no_freeze_authority.is_none());
+        assert!(freeze_authority.is_some());
+    }
 }

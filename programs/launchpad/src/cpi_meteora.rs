@@ -37,6 +37,10 @@ const INITIALIZE_POOL_DISC: [u8; 8] = [95, 180, 10, 172, 84, 174, 232, 40];
 /// sha256("global:swap")[..8]
 const SWAP_DISC: [u8; 8] = [248, 198, 158, 145, 225, 117, 135, 200];
 
+/// Anchor instruction discriminator for `claim_position_fee`
+/// sha256("global:claim_position_fee")[..8]
+const CLAIM_POSITION_FEE_DISC: [u8; 8] = [180, 38, 154, 17, 133, 33, 162, 211];
+
 // ── Initialize Pool CPI ─────────────────────────────────────────────────
 
 /// Accounts required by Meteora's `initialize_pool` instruction.
@@ -261,6 +265,79 @@ pub fn cpi_swap<'info>(
 
     invoke_signed(&ix, account_infos, signer_seeds)
         .map_err(|_| error!(LaunchpadError::SlippageExceeded))?;
+
+    Ok(())
+}
+
+// ── Claim Position Fee CPI ──────────────────────────────────────────────
+
+/// Accounts required by Meteora's `claim_position_fee` instruction.
+pub struct ClaimPositionFeeAccounts<'info> {
+    pub pool_authority: AccountInfo<'info>,
+    pub pool: AccountInfo<'info>,
+    pub position: AccountInfo<'info>,
+    pub token_a_account: AccountInfo<'info>,
+    pub token_b_account: AccountInfo<'info>,
+    pub token_a_vault: AccountInfo<'info>,
+    pub token_b_vault: AccountInfo<'info>,
+    pub token_a_mint: AccountInfo<'info>,
+    pub token_b_mint: AccountInfo<'info>,
+    pub position_nft_account: AccountInfo<'info>,
+    pub owner: AccountInfo<'info>,
+    pub token_a_program: AccountInfo<'info>,
+    pub token_b_program: AccountInfo<'info>,
+    pub event_authority: AccountInfo<'info>,
+    pub meteora_program: AccountInfo<'info>,
+}
+
+pub fn cpi_claim_position_fee<'info>(
+    accounts: &ClaimPositionFeeAccounts<'info>,
+    signer_seeds: &[&[&[u8]]],
+) -> Result<()> {
+    let account_metas = vec![
+        AccountMeta::new_readonly(accounts.pool_authority.key(), false),
+        AccountMeta::new_readonly(accounts.pool.key(), false),
+        AccountMeta::new(accounts.position.key(), false),
+        AccountMeta::new(accounts.token_a_account.key(), false),
+        AccountMeta::new(accounts.token_b_account.key(), false),
+        AccountMeta::new(accounts.token_a_vault.key(), false),
+        AccountMeta::new(accounts.token_b_vault.key(), false),
+        AccountMeta::new_readonly(accounts.token_a_mint.key(), false),
+        AccountMeta::new_readonly(accounts.token_b_mint.key(), false),
+        AccountMeta::new_readonly(accounts.position_nft_account.key(), false),
+        AccountMeta::new_readonly(accounts.owner.key(), true),
+        AccountMeta::new_readonly(accounts.token_a_program.key(), false),
+        AccountMeta::new_readonly(accounts.token_b_program.key(), false),
+        AccountMeta::new_readonly(accounts.event_authority.key(), false),
+        AccountMeta::new_readonly(accounts.meteora_program.key(), false),
+    ];
+
+    let ix = Instruction {
+        program_id: METEORA_PROGRAM_ID,
+        accounts: account_metas,
+        data: CLAIM_POSITION_FEE_DISC.to_vec(),
+    };
+
+    let account_infos = &[
+        accounts.pool_authority.clone(),
+        accounts.pool.clone(),
+        accounts.position.clone(),
+        accounts.token_a_account.clone(),
+        accounts.token_b_account.clone(),
+        accounts.token_a_vault.clone(),
+        accounts.token_b_vault.clone(),
+        accounts.token_a_mint.clone(),
+        accounts.token_b_mint.clone(),
+        accounts.position_nft_account.clone(),
+        accounts.owner.clone(),
+        accounts.token_a_program.clone(),
+        accounts.token_b_program.clone(),
+        accounts.event_authority.clone(),
+        accounts.meteora_program.clone(),
+    ];
+
+    invoke_signed(&ix, account_infos, signer_seeds)
+        .map_err(|_| error!(LaunchpadError::InvalidPoolParams))?;
 
     Ok(())
 }

@@ -84,6 +84,10 @@ pub mod launchpad {
         instructions::handle_claim_presale(ctx)
     }
 
+    pub fn claim_creator_tokens(ctx: Context<ClaimCreatorTokens>) -> Result<()> {
+        instructions::handle_claim_creator_tokens(ctx)
+    }
+
     pub fn refund_presale(ctx: Context<RefundPresale>) -> Result<()> {
         instructions::handle_refund_presale(ctx)
     }
@@ -105,5 +109,17 @@ pub mod launchpad {
         params: ExecuteBuybackParams,
     ) -> Result<()> {
         instructions::handle_execute_buyback(ctx, params)
+    }
+
+    pub fn claim_lp_fees(ctx: Context<ClaimLpFees>) -> Result<()> {
+        instructions::handle_claim_lp_fees(ctx)
+    }
+
+    pub fn harvest_and_split_lp_fees(ctx: Context<HarvestAndSplitLpFees>) -> Result<()> {
+        instructions::handle_harvest_and_split_lp_fees(ctx)
+    }
+
+    pub fn split_claimed_fees(ctx: Context<SplitClaimedFees>) -> Result<()> {
+        instructions::handle_split_claimed_fees(ctx)
     }
 }

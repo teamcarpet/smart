@@ -66,6 +66,9 @@ describe("launchpad", () => {
           sellTaxBps: 2400,
           presalePlatformFeeBps: 100,
           migrationFeeBps: 100,
+          creatorFeeBps: 7000,
+          protocolFeeBps: 2950,
+          keeperFeeBps: 50,
         })
         .accounts({
           admin: admin.publicKey,
@@ -80,6 +83,9 @@ describe("launchpad", () => {
       expect(config.platformFeeBps).to.equal(50);
       expect(config.sellTaxBps).to.equal(2400);
       expect(config.migrationFeeBps).to.equal(100);
+      expect(config.creatorFeeBps).to.equal(7000);
+      expect(config.protocolFeeBps).to.equal(2950);
+      expect(config.keeperFeeBps).to.equal(50);
       expect(config.isPaused).to.equal(false);
     });
 
@@ -95,6 +101,9 @@ describe("launchpad", () => {
             sellTaxBps: 2400,
             presalePlatformFeeBps: 100,
             migrationFeeBps: 100,
+            creatorFeeBps: 7000,
+            protocolFeeBps: 2950,
+            keeperFeeBps: 50,
           })
           .accounts({
             admin: admin.publicKey,

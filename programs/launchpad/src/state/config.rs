@@ -22,6 +22,12 @@ pub struct GlobalConfig {
     pub presale_platform_fee_bps: u16,
     /// Migration fee in basis points (default: 100 = 1%)
     pub migration_fee_bps: u16,
+    /// Creator share of claimed LP fees in basis points
+    pub creator_fee_bps: u16,
+    /// Protocol share of claimed LP fees in basis points
+    pub protocol_fee_bps: u16,
+    /// Keeper reward share of claimed LP fees in basis points
+    pub keeper_fee_bps: u16,
 
     /// Pending admin for two-step transfer (Pubkey::default() = none)
     pub pending_admin: Pubkey,

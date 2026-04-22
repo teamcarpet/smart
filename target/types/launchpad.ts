@@ -264,6 +264,221 @@ export type Launchpad = {
       ]
     },
     {
+      "name": "claimCreatorTokens",
+      "discriminator": [
+        126,
+        208,
+        113,
+        43,
+        222,
+        70,
+        91,
+        48
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.mint",
+                "account": "presalePool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buybackState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.mint",
+                "account": "presalePool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creatorTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claimLpFees",
+      "discriminator": [
+        72,
+        86,
+        212,
+        142,
+        60,
+        38,
+        74,
+        75
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buybackState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyback_state.pool",
+                "account": "buybackState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lpFeeVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyback_state.pool",
+                "account": "buybackState"
+              },
+              {
+                "kind": "account",
+                "path": "lp_fee_vault.mint",
+                "account": "tokenAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creatorFeeAccount",
+          "writable": true
+        },
+        {
+          "name": "protocolFeeAccount",
+          "writable": true
+        },
+        {
+          "name": "keeperFeeAccount",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "claimPresale",
       "discriminator": [
         82,
@@ -1046,6 +1261,226 @@ export type Launchpad = {
       ]
     },
     {
+      "name": "harvestAndSplitLpFees",
+      "discriminator": [
+        213,
+        215,
+        28,
+        113,
+        143,
+        32,
+        151,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buybackState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyback_state.pool",
+                "account": "buybackState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lpCustody",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  99,
+                  117,
+                  115,
+                  116,
+                  111,
+                  100,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyback_state.pool",
+                "account": "buybackState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenAFeeVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyback_state.pool",
+                "account": "buybackState"
+              },
+              {
+                "kind": "account",
+                "path": "tokenAMint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenBFeeVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyback_state.pool",
+                "account": "buybackState"
+              },
+              {
+                "kind": "account",
+                "path": "tokenBMint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creatorFeeAccountA",
+          "writable": true
+        },
+        {
+          "name": "protocolFeeAccountA",
+          "writable": true
+        },
+        {
+          "name": "keeperFeeAccountA",
+          "writable": true
+        },
+        {
+          "name": "creatorFeeAccountB",
+          "writable": true
+        },
+        {
+          "name": "protocolFeeAccountB",
+          "writable": true
+        },
+        {
+          "name": "keeperFeeAccountB",
+          "writable": true
+        },
+        {
+          "name": "meteoraProgram"
+        },
+        {
+          "name": "meteoraPool"
+        },
+        {
+          "name": "meteoraPoolAuthority"
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "positionNftAccount"
+        },
+        {
+          "name": "meteoraTokenAVault",
+          "writable": true
+        },
+        {
+          "name": "meteoraTokenBVault",
+          "writable": true
+        },
+        {
+          "name": "tokenAMint",
+          "docs": [
+            "WSOL/token A mint."
+          ]
+        },
+        {
+          "name": "tokenBMint",
+          "docs": [
+            "Launch token mint."
+          ]
+        },
+        {
+          "name": "meteoraEventAuthority"
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize",
       "discriminator": [
         175,
@@ -1336,6 +1771,32 @@ export type Launchpad = {
         },
         {
           "name": "meteoraEventAuthority"
+        },
+        {
+          "name": "lpCustody",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  99,
+                  117,
+                  115,
+                  116,
+                  111,
+                  100,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
         },
         {
           "name": "positionNftMint",
@@ -1630,7 +2091,7 @@ export type Launchpad = {
         {
           "name": "creatorWallet",
           "docs": [
-            "Creator wallet for creator pool allocation"
+            "Creator wallet receives the creator SOL allocation."
           ],
           "writable": true
         },
@@ -1652,6 +2113,32 @@ export type Launchpad = {
         },
         {
           "name": "meteoraEventAuthority"
+        },
+        {
+          "name": "lpCustody",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  99,
+                  117,
+                  115,
+                  116,
+                  111,
+                  100,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
         },
         {
           "name": "positionNftMint",
@@ -2107,6 +2594,103 @@ export type Launchpad = {
       ]
     },
     {
+      "name": "splitClaimedFees",
+      "discriminator": [
+        133,
+        27,
+        242,
+        87,
+        63,
+        146,
+        169,
+        4
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buybackState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyback_state.pool",
+                "account": "buybackState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lpFeeVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyback_state.pool",
+                "account": "buybackState"
+              },
+              {
+                "kind": "account",
+                "path": "lp_fee_vault.mint",
+                "account": "tokenAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creatorFeeAccount",
+          "writable": true
+        },
+        {
+          "name": "protocolFeeAccount",
+          "writable": true
+        },
+        {
+          "name": "keeperFeeAccount",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "unpause",
       "discriminator": [
         169,
@@ -2541,28 +3125,58 @@ export type Launchpad = {
     },
     {
       "code": 6029,
+      "name": "idleBuybackTokens",
+      "msg": "Buyback left idle token balance"
+    },
+    {
+      "code": 6030,
       "name": "allRoundsExecuted",
       "msg": "All scheduled buyback rounds already executed"
     },
     {
-      "code": 6030,
+      "code": 6031,
       "name": "roundNotDue",
       "msg": "Next buyback round not yet due"
     },
     {
-      "code": 6031,
+      "code": 6032,
       "name": "invalidFeeConfig",
       "msg": "Invalid fee configuration"
     },
     {
-      "code": 6032,
+      "code": 6033,
       "name": "invalidPoolParams",
       "msg": "Invalid pool parameters"
     },
     {
-      "code": 6033,
+      "code": 6034,
       "name": "invalidMintSuffix",
       "msg": "Mint address must end with required launchpad suffix"
+    },
+    {
+      "code": 6035,
+      "name": "mintFreezable",
+      "msg": "Mint freeze authority must be revoked"
+    },
+    {
+      "code": 6036,
+      "name": "unsafeMintAuthority",
+      "msg": "Mint authority must be revoked or program controlled"
+    },
+    {
+      "code": 6037,
+      "name": "adminLpCustody",
+      "msg": "LP position cannot be custodied by admin"
+    },
+    {
+      "code": 6038,
+      "name": "nothingToClaim",
+      "msg": "Creator token allocation already fully claimed"
+    },
+    {
+      "code": 6039,
+      "name": "creatorOverclaim",
+      "msg": "Creator claim exceeds allocation"
     }
   ],
   "types": [
@@ -2731,9 +3345,6 @@ export type Launchpad = {
         "variants": [
           {
             "name": "burn"
-          },
-          {
-            "name": "addLiquidity"
           }
         ]
       }
@@ -2761,6 +3372,20 @@ export type Launchpad = {
             "name": "meteoraPool",
             "docs": [
               "Meteora DAMM pool created during migration — validated on every buyback"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "lpCustody",
+            "docs": [
+              "Program PDA that owns/custodies the LP position."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "positionNftMint",
+            "docs": [
+              "Meteora position NFT mint for the principal LP position."
             ],
             "type": "pubkey"
           },
@@ -2817,9 +3442,58 @@ export type Launchpad = {
             "type": "u64"
           },
           {
-            "name": "totalTokensLp",
+            "name": "idleTokens",
             "docs": [
-              "Total tokens added as liquidity"
+              "Explicit idle token accounting. Must remain zero for burn-only buybacks."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "creatorFeeBps",
+            "docs": [
+              "Creator share of claimed LP fees in basis points."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "protocolFeeBps",
+            "docs": [
+              "Protocol share of claimed LP fees in basis points."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "keeperFeeBps",
+            "docs": [
+              "Keeper reward share of claimed LP fees in basis points."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "creatorTokenAllocation",
+            "docs": [
+              "Creator token allocation claimable from the presale vault."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "creatorTokensClaimed",
+            "docs": [
+              "Creator tokens already claimed."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "totalLpFeesClaimedA",
+            "docs": [
+              "Total token-A LP fees distributed."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "totalLpFeesClaimedB",
+            "docs": [
+              "Total token-B LP fees distributed."
             ],
             "type": "u64"
           },
@@ -2977,7 +3651,7 @@ export type Launchpad = {
           {
             "name": "mode",
             "docs": [
-              "Buyback mode: Burn or AddLiquidity"
+              "Buyback mode: burn-only. Any other mode is invalid at decode time."
             ],
             "type": {
               "defined": {
@@ -3064,6 +3738,27 @@ export type Launchpad = {
             "type": "u16"
           },
           {
+            "name": "creatorFeeBps",
+            "docs": [
+              "Creator share of claimed LP fees in basis points"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "protocolFeeBps",
+            "docs": [
+              "Protocol share of claimed LP fees in basis points"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "keeperFeeBps",
+            "docs": [
+              "Keeper reward share of claimed LP fees in basis points"
+            ],
+            "type": "u16"
+          },
+          {
             "name": "pendingAdmin",
             "docs": [
               "Pending admin for two-step transfer (Pubkey::default() = none)"
@@ -3122,6 +3817,18 @@ export type Launchpad = {
           },
           {
             "name": "migrationFeeBps",
+            "type": "u16"
+          },
+          {
+            "name": "creatorFeeBps",
+            "type": "u16"
+          },
+          {
+            "name": "protocolFeeBps",
+            "type": "u16"
+          },
+          {
+            "name": "keeperFeeBps",
             "type": "u16"
           }
         ]
@@ -3551,6 +4258,24 @@ export type Launchpad = {
           },
           {
             "name": "newMigrationFeeBps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "newCreatorFeeBps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "newProtocolFeeBps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "newKeeperFeeBps",
             "type": {
               "option": "u16"
             }

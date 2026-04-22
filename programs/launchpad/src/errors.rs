@@ -95,6 +95,9 @@ pub enum LaunchpadError {
     #[msg("Invalid buyback mode")]
     InvalidBuybackMode,
 
+    #[msg("Buyback left idle token balance")]
+    IdleBuybackTokens,
+
     #[msg("All scheduled buyback rounds already executed")]
     AllRoundsExecuted,
 
@@ -110,4 +113,19 @@ pub enum LaunchpadError {
 
     #[msg("Mint address must end with required launchpad suffix")]
     InvalidMintSuffix,
+
+    #[msg("Mint freeze authority must be revoked")]
+    MintFreezable,
+
+    #[msg("Mint authority must be revoked or program controlled")]
+    UnsafeMintAuthority,
+
+    #[msg("LP position cannot be custodied by admin")]
+    AdminLpCustody,
+
+    #[msg("Creator token allocation already fully claimed")]
+    NothingToClaim,
+
+    #[msg("Creator claim exceeds allocation")]
+    CreatorOverclaim,
 }

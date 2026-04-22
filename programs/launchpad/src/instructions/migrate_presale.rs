@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, SyncNative, Token, TokenAccount};
+use anchor_spl::token::{self, Mint, SyncNative, Token, TokenAccount};
 
 use crate::cpi_meteora::{
     self, InitializePoolAccounts, InitializePoolParams, METEORA_PROGRAM_ID, POOL_AUTHORITY,
@@ -82,8 +82,7 @@ pub struct MigratePresale<'info> {
     )]
     pub platform_wallet: SystemAccount<'info>,
 
-    /// Creator wallet for creator pool allocation
-    /// CHECK: Validated against pool creator
+    /// Creator wallet receives the creator SOL allocation.
     #[account(
         mut,
         constraint = creator_wallet.key() == pool.creator @ LaunchpadError::UnauthorizedCreator,
@@ -112,6 +111,14 @@ pub struct MigratePresale<'info> {
 
     /// CHECK: Meteora event authority PDA
     pub meteora_event_authority: UncheckedAccount<'info>,
+
+    /// CHECK: Program PDA that owns/custodies the LP position.
+    #[account(
+        seeds = [BuybackState::LP_CUSTODY_SEED, pool.key().as_ref()],
+        bump,
+        constraint = lp_custody.key() != payer.key() @ LaunchpadError::AdminLpCustody,
+    )]
+    pub lp_custody: UncheckedAccount<'info>,
 
     /// CHECK: Position NFT mint (signer keypair)
     #[account(mut)]
@@ -147,7 +154,11 @@ pub struct MigratePresale<'info> {
 
     /// H-4: Token mint for Meteora + buyback vault init
     #[account(constraint = token_mint.key() == pool.mint @ LaunchpadError::InvalidPoolParams)]
-    pub token_mint: Account<'info, anchor_spl::token::Mint>,
+    #[account(
+        constraint = token_mint.freeze_authority.is_none() @ LaunchpadError::MintFreezable,
+        constraint = token_mint.mint_authority.is_none() @ LaunchpadError::UnsafeMintAuthority,
+    )]
+    pub token_mint: Account<'info, Mint>,
 
     /// Payer WSOL account
     #[account(
@@ -178,23 +189,11 @@ pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
     // ── CALCULATE SPLITS ────────────────────────────────────────────
     let total_sol = pool.current_raised;
 
-    // 1% migration fee
-    let migration_fee = fees::apply_bps(total_sol, config.migration_fee_bps)?;
-    // 20% for Meteora liquidity
-    let liquidity_sol = fees::apply_bps(total_sol, 2000)?;
-    // 20% for creator
-    let creator_sol = fees::apply_bps(total_sol, pool.creator_pool_bps)?;
-    // Remainder → buyback
-    let buyback_sol = total_sol
-        .checked_sub(migration_fee)
-        .ok_or(LaunchpadError::MathUnderflow)?
-        .checked_sub(liquidity_sol)
-        .ok_or(LaunchpadError::MathUnderflow)?
-        .checked_sub(creator_sol)
-        .ok_or(LaunchpadError::MathUnderflow)?;
-
+    let (migration_fee, liquidity_sol, creator_sol, buyback_sol) =
+        calculate_presale_sol_split(total_sol, config.migration_fee_bps)?;
     // Tokens for liquidity: 20% of total supply
     let liquidity_tokens = fees::apply_bps(pool.total_token_supply, 2000)?;
+    let creator_token_allocation = fees::apply_bps(pool.total_token_supply, pool.creator_pool_bps)?;
 
     let sqrt_price = cpi_meteora::calculate_init_sqrt_price(liquidity_sol, liquidity_tokens)?;
 
@@ -210,6 +209,8 @@ pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
     ctx.accounts.buyback_state.pool = pool_key;
     ctx.accounts.buyback_state.mint = pool_mint;
     ctx.accounts.buyback_state.meteora_pool = ctx.accounts.meteora_pool.key();
+    ctx.accounts.buyback_state.lp_custody = ctx.accounts.lp_custody.key();
+    ctx.accounts.buyback_state.position_nft_mint = ctx.accounts.position_nft_mint.key();
     ctx.accounts.buyback_state.treasury_balance = buyback_sol;
     ctx.accounts.buyback_state.initial_treasury = buyback_sol;
     ctx.accounts.buyback_state.last_buyback_slot = 0;
@@ -217,7 +218,14 @@ pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
     ctx.accounts.buyback_state.total_sol_spent = 0;
     ctx.accounts.buyback_state.total_tokens_bought = 0;
     ctx.accounts.buyback_state.total_tokens_burned = 0;
-    ctx.accounts.buyback_state.total_tokens_lp = 0;
+    ctx.accounts.buyback_state.idle_tokens = 0;
+    ctx.accounts.buyback_state.creator_fee_bps = config.creator_fee_bps;
+    ctx.accounts.buyback_state.protocol_fee_bps = config.protocol_fee_bps;
+    ctx.accounts.buyback_state.keeper_fee_bps = config.keeper_fee_bps;
+    ctx.accounts.buyback_state.creator_token_allocation = creator_token_allocation;
+    ctx.accounts.buyback_state.creator_tokens_claimed = 0;
+    ctx.accounts.buyback_state.total_lp_fees_claimed_a = 0;
+    ctx.accounts.buyback_state.total_lp_fees_claimed_b = 0;
     ctx.accounts.buyback_state.pool_type = 1;
     ctx.accounts.buyback_state.total_rounds = mode.total_rounds();
     ctx.accounts.buyback_state.rounds_executed = 0;
@@ -248,7 +256,7 @@ pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
         )?;
     }
 
-    // 2. Creator pool SOL → creator
+    // 2. Creator SOL allocation → creator wallet
     if creator_sol > 0 {
         anchor_lang::system_program::transfer(
             CpiContext::new_with_signer(
@@ -305,7 +313,7 @@ pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
 
     // 5. CPI: Create Meteora DAMM v2 pool
     let meteora_accounts = InitializePoolAccounts {
-        creator: ctx.accounts.payer.to_account_info(),
+        creator: ctx.accounts.lp_custody.to_account_info(),
         payer: ctx.accounts.payer.to_account_info(),
         position_nft_mint: ctx.accounts.position_nft_mint.to_account_info(),
         position_nft_account: ctx.accounts.position_nft_account.to_account_info(),
@@ -351,4 +359,40 @@ pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
     });
 
     Ok(())
+}
+
+fn calculate_presale_sol_split(
+    total_sol: u64,
+    migration_fee_bps: u16,
+) -> Result<(u64, u64, u64, u64)> {
+    let migration_fee = fees::apply_bps(total_sol, migration_fee_bps)?;
+    let liquidity_sol = fees::apply_bps(total_sol, 2000)?;
+    let creator_sol = fees::apply_bps(total_sol, 2000)?;
+    let buyback_sol = total_sol
+        .checked_sub(migration_fee)
+        .ok_or(LaunchpadError::MathUnderflow)?
+        .checked_sub(liquidity_sol)
+        .ok_or(LaunchpadError::MathUnderflow)?
+        .checked_sub(creator_sol)
+        .ok_or(LaunchpadError::MathUnderflow)?;
+
+    Ok((migration_fee, liquidity_sol, creator_sol, buyback_sol))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn presale_sol_split_pays_platform_creator_liquidity_and_buyback() {
+        let total_sol = 100_000_000_000;
+        let (fee, liquidity, creator, buyback) =
+            calculate_presale_sol_split(total_sol, 100).unwrap();
+
+        assert_eq!(fee, 1_000_000_000);
+        assert_eq!(liquidity, 20_000_000_000);
+        assert_eq!(creator, 20_000_000_000);
+        assert_eq!(buyback, 59_000_000_000);
+        assert_eq!(fee + liquidity + creator + buyback, total_sol);
+    }
 }

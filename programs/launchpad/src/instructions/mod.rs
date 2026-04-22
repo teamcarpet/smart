@@ -1,5 +1,7 @@
 pub mod admin;
 pub mod buy_bonding;
+pub mod claim_creator_tokens;
+pub mod claim_lp_fees;
 pub mod claim_presale;
 pub mod contribute_presale;
 pub mod create_bonding_pool;
@@ -13,6 +15,8 @@ pub mod sell_bonding;
 
 pub use admin::*;
 pub use buy_bonding::*;
+pub use claim_creator_tokens::*;
+pub use claim_lp_fees::*;
 pub use claim_presale::*;
 pub use contribute_presale::*;
 pub use create_bonding_pool::*;

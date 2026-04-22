@@ -39,6 +39,7 @@ pub struct CreatePresalePool<'info> {
         constraint = mint.decimals == 6,
         constraint = mint.supply == 0,
         constraint = mint.mint_authority.contains(&creator.key()),
+        constraint = mint.freeze_authority.is_none() @ LaunchpadError::MintFreezable,
     )]
     pub mint: Box<Account<'info, Mint>>,
 
@@ -120,6 +121,15 @@ pub fn handle_create_presale_pool(
     };
     let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
     token::set_authority(cpi_ctx, AuthorityType::MintTokens, None)?;
+    ctx.accounts.mint.reload()?;
+    require!(
+        ctx.accounts.mint.mint_authority.is_none(),
+        LaunchpadError::UnsafeMintAuthority
+    );
+    require!(
+        ctx.accounts.mint.freeze_authority.is_none(),
+        LaunchpadError::MintFreezable
+    );
 
     // Initialize pool state
     let pool = &mut ctx.accounts.pool;

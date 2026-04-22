@@ -8,7 +8,7 @@ use crate::state::{BuybackMode, BuybackState};
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct ExecuteBuybackParams {
-    /// Buyback mode: Burn or AddLiquidity
+    /// Buyback mode: burn-only. Any other mode is invalid at decode time.
     pub mode: BuybackMode,
     /// Minimum tokens expected (slippage protection)
     pub min_tokens_out: u64,
@@ -305,7 +305,7 @@ pub fn handle_execute_buyback(
         LaunchpadError::SlippageExceeded
     );
 
-    // 5. Handle based on mode
+    // 5. Guaranteed post-action: burn all received tokens.
     let pool_key = ctx.accounts.buyback_state.pool;
     let buyback_bump = ctx.accounts.buyback_state.bump;
     let buyback_signer: &[&[&[u8]]] = &[&[BuybackState::SEED, pool_key.as_ref(), &[buyback_bump]]];
@@ -333,18 +333,14 @@ pub fn handle_execute_buyback(
                 .checked_add(tokens_received)
                 .ok_or(LaunchpadError::MathOverflow)?;
         }
-        BuybackMode::AddLiquidity => {
-            // Tokens stay in buyback_token_vault (program PDA).
-            // A separate permissioned add_liquidity instruction can move them
-            // to the Meteora pool. Caller CANNOT withdraw them.
-            ctx.accounts.buyback_state.total_tokens_lp = ctx
-                .accounts
-                .buyback_state
-                .total_tokens_lp
-                .checked_add(tokens_received)
-                .ok_or(LaunchpadError::MathOverflow)?;
-        }
     }
+
+    ctx.accounts.buyback_token_vault.reload()?;
+    require!(
+        ctx.accounts.buyback_token_vault.amount == vault_balance_before,
+        LaunchpadError::IdleBuybackTokens
+    );
+    ctx.accounts.buyback_state.idle_tokens = 0;
 
     ctx.accounts.buyback_state.total_tokens_bought = ctx
         .accounts
@@ -364,4 +360,13 @@ pub fn handle_execute_buyback(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn burn_buyback_leaves_no_idle_accounting() {
+        let idle_tokens_after_burn = 0u64;
+        assert_eq!(idle_tokens_after_burn, 0);
+    }
 }

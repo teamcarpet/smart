@@ -183,6 +183,9 @@ async function main() {
         sellTaxBps: 2400,
         presalePlatformFeeBps: 100,
         migrationFeeBps: 100,
+        creatorFeeBps: 7000,
+        protocolFeeBps: 2950,
+        keeperFeeBps: 50,
       })
       .accounts({
         admin: wallet.publicKey,
