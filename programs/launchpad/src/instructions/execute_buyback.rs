@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, SyncNative, Token, TokenAccount};
 
-use crate::cpi_meteora::{self, SwapAccounts, SwapParams, METEORA_PROGRAM_ID};
+use crate::cpi_meteora::{self, SwapAccounts, SwapParams, METEORA_PROGRAM_ID, POOL_AUTHORITY};
 use crate::errors::LaunchpadError;
 use crate::events::BuybackExecuted;
 use crate::state::{BuybackMode, BuybackState};
@@ -73,6 +73,10 @@ pub struct ExecuteBuyback<'info> {
     )]
     pub meteora_pool: UncheckedAccount<'info>,
 
+    /// CHECK: Meteora pool authority PDA.
+    #[account(constraint = meteora_pool_authority.key() == POOL_AUTHORITY @ LaunchpadError::InvalidPoolParams)]
+    pub meteora_pool_authority: UncheckedAccount<'info>,
+
     /// Meteora input vault (SOL/WSOL side)
     #[account(
         mut,
@@ -102,9 +106,8 @@ pub struct ExecuteBuyback<'info> {
     )]
     pub payer_wsol_account: Box<Account<'info, TokenAccount>>,
 
-    /// CHECK: Protocol fee account for Meteora
-    #[account(mut)]
-    pub protocol_fee: UncheckedAccount<'info>,
+    /// CHECK: Meteora event authority PDA.
+    pub meteora_event_authority: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -268,17 +271,18 @@ pub fn handle_execute_buyback(
     // 3. CPI: Swap SOL → Token on Meteora
     //    FIX #1: Tokens go to buyback_token_vault (PDA), NOT payer
     let swap_accounts = SwapAccounts {
+        pool_authority: ctx.accounts.meteora_pool_authority.to_account_info(),
         pool: ctx.accounts.meteora_pool.to_account_info(),
-        input_vault: ctx.accounts.meteora_input_vault.to_account_info(),
-        output_vault: ctx.accounts.meteora_output_vault.to_account_info(),
-        input_mint: ctx.accounts.wsol_mint.to_account_info(),
-        output_mint: ctx.accounts.token_mint.to_account_info(),
-        user_input_token: ctx.accounts.payer_wsol_account.to_account_info(),
-        user_output_token: ctx.accounts.buyback_token_vault.to_account_info(),
-        user: ctx.accounts.payer.to_account_info(),
-        protocol_fee: ctx.accounts.protocol_fee.to_account_info(),
-        input_token_program: ctx.accounts.token_program.to_account_info(),
-        output_token_program: ctx.accounts.token_program.to_account_info(),
+        input_token_account: ctx.accounts.payer_wsol_account.to_account_info(),
+        output_token_account: ctx.accounts.buyback_token_vault.to_account_info(),
+        token_a_vault: ctx.accounts.meteora_input_vault.to_account_info(),
+        token_b_vault: ctx.accounts.meteora_output_vault.to_account_info(),
+        token_a_mint: ctx.accounts.wsol_mint.to_account_info(),
+        token_b_mint: ctx.accounts.token_mint.to_account_info(),
+        payer: ctx.accounts.payer.to_account_info(),
+        token_a_program: ctx.accounts.token_program.to_account_info(),
+        token_b_program: ctx.accounts.token_program.to_account_info(),
+        event_authority: ctx.accounts.meteora_event_authority.to_account_info(),
         meteora_program: ctx.accounts.meteora_program.to_account_info(),
     };
 

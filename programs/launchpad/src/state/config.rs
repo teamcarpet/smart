@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+pub const KEEPER_WALLET: Pubkey = pubkey!("3C6H3pudeYKfMqqc68j9Gk1xXnRAvgwsJGqWH9aBF61n");
+
 #[account]
 #[derive(InitSpace)]
 pub struct GlobalConfig {
@@ -28,6 +30,8 @@ pub struct GlobalConfig {
     pub protocol_fee_bps: u16,
     /// Keeper reward share of claimed LP fees in basis points
     pub keeper_fee_bps: u16,
+    /// Fixed protocol keeper wallet for LP fee harvesting and rewards
+    pub keeper_wallet: Pubkey,
 
     /// Pending admin for two-step transfer (Pubkey::default() = none)
     pub pending_admin: Pubkey,

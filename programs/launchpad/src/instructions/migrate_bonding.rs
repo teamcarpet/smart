@@ -193,8 +193,10 @@ pub fn handle_migrate_bonding(ctx: Context<MigrateBonding>) -> Result<()> {
             pool.real_token_reserves,
         )?;
 
-    // Calculate sqrt_price for Meteora pool
+    // Calculate Meteora init price/liquidity from actual deposited amounts.
     let sqrt_price = cpi_meteora::calculate_init_sqrt_price(liquidity_sol, liquidity_tokens)?;
+    let initial_liquidity =
+        cpi_meteora::calculate_initial_liquidity(liquidity_sol, liquidity_tokens, sqrt_price)?;
 
     // ── PRE-CAPTURE ─────────────────────────────────────────────────
     let pool_key = ctx.accounts.pool.key();
@@ -324,7 +326,7 @@ pub fn handle_migrate_bonding(ctx: Context<MigrateBonding>) -> Result<()> {
     };
 
     let meteora_params = InitializePoolParams {
-        liquidity: liquidity_tokens as u128, // initial liquidity amount
+        liquidity: initial_liquidity,
         sqrt_price,
         activation_point: None, // activate immediately
     };

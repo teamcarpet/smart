@@ -51,6 +51,7 @@ async function main() {
 
   const sellerTokenAccount = getAssociatedTokenAddressSync(MINT, wallet.publicKey);
   const config = await program.account.globalConfig.fetch(configPda);
+  const pool = await program.account.bondingCurvePool.fetch(poolPda);
 
   const beforeWalletLamports = await provider.connection.getBalance(wallet.publicKey);
   const beforeSolVaultLamports = await provider.connection.getBalance(solVaultPda);
@@ -73,6 +74,7 @@ async function main() {
       solVault: solVaultPda,
       tokenVault: tokenVaultPda,
       sellerTokenAccount,
+      creatorWallet: pool.creator,
       platformWallet: config.platformWallet,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,

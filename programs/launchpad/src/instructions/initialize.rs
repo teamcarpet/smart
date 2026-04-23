@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::errors::LaunchpadError;
 use crate::events::ConfigUpdated;
-use crate::state::GlobalConfig;
+use crate::state::{GlobalConfig, KEEPER_WALLET};
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct InitializeParams {
@@ -76,6 +76,7 @@ pub fn handle_initialize(ctx: Context<Initialize>, params: InitializeParams) -> 
     config.creator_fee_bps = params.creator_fee_bps;
     config.protocol_fee_bps = params.protocol_fee_bps;
     config.keeper_fee_bps = params.keeper_fee_bps;
+    config.keeper_wallet = KEEPER_WALLET;
     config.pending_admin = Pubkey::default();
     config.is_paused = false;
     config.bump = ctx.bumps.config;

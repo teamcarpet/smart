@@ -64,12 +64,12 @@ pub struct BuyBonding<'info> {
     )]
     pub buyer_token_account: Box<Account<'info, TokenAccount>>,
 
-    /// CHECK: Validated against config
+    /// CHECK: Validated against the pool creator
     #[account(
         mut,
-        constraint = dev_wallet.key() == config.dev_wallet @ LaunchpadError::InvalidFeeConfig,
+        constraint = creator_wallet.key() == pool.creator @ LaunchpadError::InvalidFeeConfig,
     )]
-    pub dev_wallet: SystemAccount<'info>,
+    pub creator_wallet: SystemAccount<'info>,
 
     /// CHECK: Validated against config
     #[account(
@@ -186,17 +186,17 @@ pub fn handle_buy_bonding(
         buy_fees.net_amount,
     )?;
 
-    // Dev fee
-    if buy_fees.dev_fee > 0 {
+    // Creator fee
+    if buy_fees.creator_fee > 0 {
         system_program::transfer(
             CpiContext::new(
                 ctx.accounts.system_program.to_account_info(),
                 system_program::Transfer {
                     from: ctx.accounts.buyer.to_account_info(),
-                    to: ctx.accounts.dev_wallet.to_account_info(),
+                    to: ctx.accounts.creator_wallet.to_account_info(),
                 },
             ),
-            buy_fees.dev_fee,
+            buy_fees.creator_fee,
         )?;
     }
 
@@ -239,7 +239,7 @@ pub fn handle_buy_bonding(
         buyer: ctx.accounts.buyer.key(),
         sol_amount,
         token_amount: tokens_out,
-        dev_fee: buy_fees.dev_fee,
+        creator_fee: buy_fees.creator_fee,
         platform_fee: buy_fees.platform_fee,
         new_price,
         timestamp: Clock::get()?.unix_timestamp,

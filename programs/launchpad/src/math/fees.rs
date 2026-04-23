@@ -6,8 +6,8 @@ pub const BPS_DENOMINATOR: u64 = 10_000;
 /// Fee breakdown for a bonding curve buy.
 #[derive(Debug, Clone, Copy)]
 pub struct BuyFees {
-    /// Fee going to dev wallet
-    pub dev_fee: u64,
+    /// Fee going to the token creator
+    pub creator_fee: u64,
     /// Fee going to platform wallet
     pub platform_fee: u64,
     /// Total fee deducted
@@ -19,7 +19,9 @@ pub struct BuyFees {
 /// Fee breakdown for a bonding curve sell.
 #[derive(Debug, Clone, Copy)]
 pub struct SellFees {
-    /// Platform fee (1% of SOL output)
+    /// Fee going to the token creator
+    pub creator_fee: u64,
+    /// Fee going to platform wallet
     pub platform_fee: u64,
     /// Sell tax going to buyback treasury (24% of SOL output)
     pub sell_tax: u64,
@@ -43,34 +45,34 @@ pub fn apply_bps(amount: u64, bps: u16) -> Result<u64> {
 
 /// Calculate buy fees for bonding curve.
 ///
-/// Total buy fee = dev_fee_bps + platform_fee_bps (deducted from SOL input).
+/// Total buy fee = creator_fee_bps + platform_fee_bps (deducted from SOL input).
 /// Net SOL = input - total_fee → goes into bonding curve.
 pub fn calculate_buy_fees(
     sol_amount: u64,
-    dev_fee_bps: u16,
+    creator_fee_bps: u16,
     platform_fee_bps: u16,
 ) -> Result<BuyFees> {
-    let total_bps = dev_fee_bps
+    let total_bps = creator_fee_bps
         .checked_add(platform_fee_bps)
         .ok_or(LaunchpadError::MathOverflow)?;
 
     let total_fee = apply_bps(sol_amount, total_bps)?;
 
-    // Split proportionally: dev gets dev_bps / total_bps of total_fee
-    let dev_fee = if total_bps > 0 {
-        let dev: u128 = (total_fee as u128)
-            .checked_mul(dev_fee_bps as u128)
+    // Split proportionally: creator gets creator_bps / total_bps of total_fee
+    let creator_fee = if total_bps > 0 {
+        let creator: u128 = (total_fee as u128)
+            .checked_mul(creator_fee_bps as u128)
             .ok_or(LaunchpadError::MathOverflow)?
             .checked_div(total_bps as u128)
             .ok_or(LaunchpadError::DivisionByZero)?;
-        u64::try_from(dev).map_err(|_| error!(LaunchpadError::CastOverflow))?
+        u64::try_from(creator).map_err(|_| error!(LaunchpadError::CastOverflow))?
     } else {
         0
     };
 
     // Platform gets remainder to avoid rounding dust
     let platform_fee = total_fee
-        .checked_sub(dev_fee)
+        .checked_sub(creator_fee)
         .ok_or(LaunchpadError::MathUnderflow)?;
 
     let net_amount = sol_amount
@@ -78,7 +80,7 @@ pub fn calculate_buy_fees(
         .ok_or(LaunchpadError::MathUnderflow)?;
 
     Ok(BuyFees {
-        dev_fee,
+        creator_fee,
         platform_fee,
         total_fee,
         net_amount,
@@ -88,18 +90,23 @@ pub fn calculate_buy_fees(
 /// Calculate sell fees for bonding curve.
 ///
 /// From the gross SOL output of the curve:
+/// - creator_fee_bps → creator wallet
 /// - platform_fee_bps → platform wallet
 /// - sell_tax_bps → buyback treasury
 /// - remainder → user
 pub fn calculate_sell_fees(
     gross_sol_out: u64,
+    creator_fee_bps: u16,
     platform_fee_bps: u16,
     sell_tax_bps: u16,
 ) -> Result<SellFees> {
+    let creator_fee = apply_bps(gross_sol_out, creator_fee_bps)?;
     let platform_fee = apply_bps(gross_sol_out, platform_fee_bps)?;
     let sell_tax = apply_bps(gross_sol_out, sell_tax_bps)?;
 
-    let total_fee = platform_fee
+    let total_fee = creator_fee
+        .checked_add(platform_fee)
+        .ok_or(LaunchpadError::MathOverflow)?
         .checked_add(sell_tax)
         .ok_or(LaunchpadError::MathOverflow)?;
 
@@ -108,6 +115,7 @@ pub fn calculate_sell_fees(
         .ok_or(LaunchpadError::MathUnderflow)?;
 
     Ok(SellFees {
+        creator_fee,
         platform_fee,
         sell_tax,
         total_fee,
@@ -149,16 +157,17 @@ mod tests {
         let fees = calculate_buy_fees(1_000_000_000, 50, 50).unwrap();
         // 1% total = 10_000_000
         assert_eq!(fees.total_fee, 10_000_000);
-        assert_eq!(fees.dev_fee, 5_000_000);
+        assert_eq!(fees.creator_fee, 5_000_000);
         assert_eq!(fees.platform_fee, 5_000_000);
         assert_eq!(fees.net_amount, 990_000_000);
     }
 
     #[test]
     fn test_sell_fees() {
-        let fees = calculate_sell_fees(1_000_000_000, 100, 2400).unwrap();
-        // 1% platform = 10M, 24% tax = 240M
-        assert_eq!(fees.platform_fee, 10_000_000);
+        let fees = calculate_sell_fees(1_000_000_000, 50, 50, 2400).unwrap();
+        // 0.5% creator = 5M, 0.5% platform = 5M, 24% tax = 240M
+        assert_eq!(fees.creator_fee, 5_000_000);
+        assert_eq!(fees.platform_fee, 5_000_000);
         assert_eq!(fees.sell_tax, 240_000_000);
         assert_eq!(fees.net_amount, 750_000_000);
     }

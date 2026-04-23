@@ -1,5 +1,5 @@
 {
-  "address": "J4uWb4jjz8VmXCGMWNjM6Tp3rqGv69Sd7SKoMtzsV3fF",
+  "address": "DywpVp5YfLiX4M3xfEp333Y2dmq8xywdNAYaWDw6v9XV",
   "metadata": {
     "name": "launchpad",
     "version": "0.1.0",
@@ -230,7 +230,7 @@
           "writable": true
         },
         {
-          "name": "dev_wallet",
+          "name": "creator_wallet",
           "writable": true
         },
         {
@@ -394,6 +394,24 @@
           "signer": true
         },
         {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "buyback_state",
           "writable": true,
           "pda": {
@@ -452,6 +470,15 @@
               }
             ]
           }
+        },
+        {
+          "name": "creator_wallet"
+        },
+        {
+          "name": "protocol_wallet"
+        },
+        {
+          "name": "pool"
         },
         {
           "name": "creator_fee_account",
@@ -1207,6 +1234,9 @@
           "writable": true
         },
         {
+          "name": "meteora_pool_authority"
+        },
+        {
           "name": "meteora_input_vault",
           "docs": [
             "Meteora input vault (SOL/WSOL side)"
@@ -1231,8 +1261,7 @@
           "writable": true
         },
         {
-          "name": "protocol_fee",
-          "writable": true
+          "name": "meteora_event_authority"
         },
         {
           "name": "token_program",
@@ -1271,6 +1300,24 @@
           "name": "payer",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "buyback_state",
@@ -1391,6 +1438,15 @@
               }
             ]
           }
+        },
+        {
+          "name": "creator_wallet"
+        },
+        {
+          "name": "protocol_wallet"
+        },
+        {
+          "name": "pool"
         },
         {
           "name": "creator_fee_account_a",
@@ -2561,6 +2617,10 @@
           "writable": true
         },
         {
+          "name": "creator_wallet",
+          "writable": true
+        },
+        {
           "name": "platform_wallet",
           "docs": [
             "Platform wallet receives platform fee"
@@ -2604,6 +2664,24 @@
           "name": "payer",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "buyback_state",
@@ -2664,6 +2742,15 @@
               }
             ]
           }
+        },
+        {
+          "name": "creator_wallet"
+        },
+        {
+          "name": "protocol_wallet"
+        },
+        {
+          "name": "pool"
         },
         {
           "name": "creator_fee_account",
@@ -2768,6 +2855,55 @@
               "name": "UpdateConfigParams"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "upgrade_config_v2",
+      "discriminator": [
+        19,
+        182,
+        14,
+        42,
+        207,
+        154,
+        117,
+        88
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "keeper_fee_bps",
+          "type": "u16"
         }
       ]
     }
@@ -3753,6 +3889,13 @@
             "type": "u16"
           },
           {
+            "name": "keeper_wallet",
+            "docs": [
+              "Fixed protocol keeper wallet for LP fee harvesting and rewards"
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "pending_admin",
             "docs": [
               "Pending admin for two-step transfer (Pubkey::default() = none)"
@@ -4145,7 +4288,7 @@
             "type": "u64"
           },
           {
-            "name": "dev_fee",
+            "name": "creator_fee",
             "type": "u64"
           },
           {
@@ -4182,6 +4325,10 @@
           },
           {
             "name": "sol_amount",
+            "type": "u64"
+          },
+          {
+            "name": "creator_fee",
             "type": "u64"
           },
           {

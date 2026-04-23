@@ -53,6 +53,13 @@ pub struct SellBonding<'info> {
     )]
     pub seller_token_account: Account<'info, TokenAccount>,
 
+    /// CHECK: Validated against the pool creator
+    #[account(
+        mut,
+        constraint = creator_wallet.key() == pool.creator @ LaunchpadError::InvalidFeeConfig,
+    )]
+    pub creator_wallet: SystemAccount<'info>,
+
     /// Platform wallet receives platform fee
     /// CHECK: Validated against config
     #[account(
@@ -86,10 +93,11 @@ pub fn handle_sell_bonding(
 
     require!(gross_sol_out > 0, LaunchpadError::ZeroAmount);
 
-    // Calculate sell fees: 1% platform + 24% sell tax
+    // Calculate sell fees: creator split + platform split + sell tax
     let sell_fees = fees::calculate_sell_fees(
         gross_sol_out,
-        config.platform_fee_bps, // 1% platform on sell
+        config.dev_fee_bps,      // creator share on sell
+        config.platform_fee_bps, // platform share on sell
         config.sell_tax_bps,     // 24% sell tax
     )?;
 
@@ -108,6 +116,8 @@ pub fn handle_sell_bonding(
     // H-6: Ensure vault stays above rent-exempt minimum after transfer
     let total_out = sell_fees
         .net_amount
+        .checked_add(sell_fees.creator_fee)
+        .ok_or(LaunchpadError::MathOverflow)?
         .checked_add(sell_fees.platform_fee)
         .ok_or(LaunchpadError::MathOverflow)?;
     let vault_lamports = ctx.accounts.sol_vault.to_account_info().lamports();
@@ -185,6 +195,21 @@ pub fn handle_sell_bonding(
         )?;
     }
 
+    // Transfer creator fee to creator wallet
+    if sell_fees.creator_fee > 0 {
+        anchor_lang::system_program::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.sol_vault.to_account_info(),
+                    to: ctx.accounts.creator_wallet.to_account_info(),
+                },
+                sol_vault_signer_seeds,
+            ),
+            sell_fees.creator_fee,
+        )?;
+    }
+
     // Transfer platform fee to platform wallet
     if sell_fees.platform_fee > 0 {
         anchor_lang::system_program::transfer(
@@ -213,6 +238,7 @@ pub fn handle_sell_bonding(
         seller: ctx.accounts.seller.key(),
         token_amount,
         sol_amount: sell_fees.net_amount,
+        creator_fee: sell_fees.creator_fee,
         platform_fee: sell_fees.platform_fee,
         sell_tax: sell_fees.sell_tax,
         new_price,

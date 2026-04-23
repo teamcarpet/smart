@@ -10,7 +10,7 @@ pub mod vanity;
 
 use instructions::*;
 
-declare_id!("J4uWb4jjz8VmXCGMWNjM6Tp3rqGv69Sd7SKoMtzsV3fF");
+declare_id!("DywpVp5YfLiX4M3xfEp333Y2dmq8xywdNAYaWDw6v9XV");
 
 #[program]
 pub mod launchpad {
@@ -24,6 +24,10 @@ pub mod launchpad {
 
     pub fn update_config(ctx: Context<UpdateConfig>, params: UpdateConfigParams) -> Result<()> {
         instructions::handle_update_config(ctx, params)
+    }
+
+    pub fn upgrade_config_v2(ctx: Context<UpgradeConfigV2>, keeper_fee_bps: u16) -> Result<()> {
+        instructions::handle_upgrade_config_v2(ctx, keeper_fee_bps)
     }
 
     pub fn propose_admin(ctx: Context<ProposeAdmin>, new_admin: Pubkey) -> Result<()> {

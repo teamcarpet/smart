@@ -1,15 +1,21 @@
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::associated_token::{get_associated_token_address, AssociatedToken};
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::cpi_meteora::{self, ClaimPositionFeeAccounts, METEORA_PROGRAM_ID, POOL_AUTHORITY};
 use crate::errors::LaunchpadError;
-use crate::state::BuybackState;
+use crate::state::{BuybackState, GlobalConfig};
 
 #[derive(Accounts)]
 pub struct ClaimLpFees<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+
+    #[account(
+        seeds = [GlobalConfig::SEED],
+        bump = config.bump,
+    )]
+    pub config: Box<Account<'info, GlobalConfig>>,
 
     #[account(
         mut,
@@ -24,16 +30,29 @@ pub struct ClaimLpFees<'info> {
         seeds = [BuybackState::LP_FEE_VAULT_SEED, buyback_state.pool.as_ref(), lp_fee_vault.mint.as_ref()],
         bump,
     )]
-    pub lp_fee_vault: Account<'info, TokenAccount>,
+    pub lp_fee_vault: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK: Creator is validated against the pool account.
+    pub creator_wallet: UncheckedAccount<'info>,
+
+    /// CHECK: Protocol wallet is validated against config.platform_wallet.
+    pub protocol_wallet: UncheckedAccount<'info>,
+
+    /// CHECK: Pool account is validated against buyback_state.pool and this program.
+    #[account(
+        constraint = pool.key() == buyback_state.pool @ LaunchpadError::InvalidPoolParams,
+        constraint = *pool.owner == crate::ID @ LaunchpadError::InvalidPoolParams,
+    )]
+    pub pool: UncheckedAccount<'info>,
 
     #[account(mut, token::mint = lp_fee_vault.mint)]
-    pub creator_fee_account: Account<'info, TokenAccount>,
+    pub creator_fee_account: Box<Account<'info, TokenAccount>>,
 
     #[account(mut, token::mint = lp_fee_vault.mint)]
-    pub protocol_fee_account: Account<'info, TokenAccount>,
+    pub protocol_fee_account: Box<Account<'info, TokenAccount>>,
 
     #[account(mut, token::mint = lp_fee_vault.mint)]
-    pub keeper_fee_account: Account<'info, TokenAccount>,
+    pub keeper_fee_account: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -44,11 +63,17 @@ pub struct SplitClaimedFees<'info> {
     pub payer: Signer<'info>,
 
     #[account(
+        seeds = [GlobalConfig::SEED],
+        bump = config.bump,
+    )]
+    pub config: Box<Account<'info, GlobalConfig>>,
+
+    #[account(
         mut,
         seeds = [BuybackState::SEED, buyback_state.pool.as_ref()],
         bump = buyback_state.bump,
     )]
-    pub buyback_state: Account<'info, BuybackState>,
+    pub buyback_state: Box<Account<'info, BuybackState>>,
 
     #[account(
         mut,
@@ -56,16 +81,29 @@ pub struct SplitClaimedFees<'info> {
         seeds = [BuybackState::LP_FEE_VAULT_SEED, buyback_state.pool.as_ref(), lp_fee_vault.mint.as_ref()],
         bump,
     )]
-    pub lp_fee_vault: Account<'info, TokenAccount>,
+    pub lp_fee_vault: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK: Creator is validated against the pool account.
+    pub creator_wallet: UncheckedAccount<'info>,
+
+    /// CHECK: Protocol wallet is validated against config.platform_wallet.
+    pub protocol_wallet: UncheckedAccount<'info>,
+
+    /// CHECK: Pool account is validated against buyback_state.pool and this program.
+    #[account(
+        constraint = pool.key() == buyback_state.pool @ LaunchpadError::InvalidPoolParams,
+        constraint = *pool.owner == crate::ID @ LaunchpadError::InvalidPoolParams,
+    )]
+    pub pool: UncheckedAccount<'info>,
 
     #[account(mut, token::mint = lp_fee_vault.mint)]
-    pub creator_fee_account: Account<'info, TokenAccount>,
+    pub creator_fee_account: Box<Account<'info, TokenAccount>>,
 
     #[account(mut, token::mint = lp_fee_vault.mint)]
-    pub protocol_fee_account: Account<'info, TokenAccount>,
+    pub protocol_fee_account: Box<Account<'info, TokenAccount>>,
 
     #[account(mut, token::mint = lp_fee_vault.mint)]
-    pub keeper_fee_account: Account<'info, TokenAccount>,
+    pub keeper_fee_account: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -74,6 +112,12 @@ pub struct SplitClaimedFees<'info> {
 pub struct HarvestAndSplitLpFees<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+
+    #[account(
+        seeds = [GlobalConfig::SEED],
+        bump = config.bump,
+    )]
+    pub config: Box<Account<'info, GlobalConfig>>,
 
     #[account(
         mut,
@@ -109,6 +153,19 @@ pub struct HarvestAndSplitLpFees<'info> {
         bump,
     )]
     pub token_b_fee_vault: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK: Creator is validated against the pool account.
+    pub creator_wallet: UncheckedAccount<'info>,
+
+    /// CHECK: Protocol wallet is validated against config.platform_wallet.
+    pub protocol_wallet: UncheckedAccount<'info>,
+
+    /// CHECK: Pool account is validated against buyback_state.pool and this program.
+    #[account(
+        constraint = pool.key() == buyback_state.pool @ LaunchpadError::InvalidPoolParams,
+        constraint = *pool.owner == crate::ID @ LaunchpadError::InvalidPoolParams,
+    )]
+    pub pool: UncheckedAccount<'info>,
 
     #[account(mut, token::mint = token_a_mint)]
     pub creator_fee_account_a: Box<Account<'info, TokenAccount>>,
@@ -172,6 +229,23 @@ pub struct HarvestAndSplitLpFees<'info> {
 }
 
 pub fn handle_claim_lp_fees(ctx: Context<ClaimLpFees>) -> Result<()> {
+    validate_fee_destinations(
+        &ctx.accounts.pool,
+        &ctx.accounts.config,
+        &ctx.accounts.lp_fee_vault,
+        &ctx.accounts.creator_wallet,
+        &ctx.accounts.protocol_wallet,
+        &ctx.accounts.creator_fee_account,
+        &ctx.accounts.protocol_fee_account,
+        &ctx.accounts.keeper_fee_account,
+    )?;
+
+    let (protocol_fee_bps, keeper_fee_bps) = keeper_fee_split_for_mint(
+        ctx.accounts.lp_fee_vault.mint,
+        ctx.accounts.buyback_state.protocol_fee_bps,
+        ctx.accounts.buyback_state.keeper_fee_bps,
+    );
+
     let claimed = ctx.accounts.lp_fee_vault.amount;
     split_one_side(
         ctx.accounts.token_program.to_account_info(),
@@ -179,8 +253,8 @@ pub fn handle_claim_lp_fees(ctx: Context<ClaimLpFees>) -> Result<()> {
         ctx.accounts.buyback_state.pool,
         ctx.accounts.buyback_state.bump,
         ctx.accounts.buyback_state.creator_fee_bps,
-        ctx.accounts.buyback_state.protocol_fee_bps,
-        ctx.accounts.buyback_state.keeper_fee_bps,
+        protocol_fee_bps,
+        keeper_fee_bps,
         ctx.accounts.lp_fee_vault.to_account_info(),
         ctx.accounts.creator_fee_account.to_account_info(),
         ctx.accounts.protocol_fee_account.to_account_info(),
@@ -197,6 +271,27 @@ pub fn handle_claim_lp_fees(ctx: Context<ClaimLpFees>) -> Result<()> {
 }
 
 pub fn handle_harvest_and_split_lp_fees(ctx: Context<HarvestAndSplitLpFees>) -> Result<()> {
+    validate_fee_destinations(
+        &ctx.accounts.pool,
+        &ctx.accounts.config,
+        &ctx.accounts.token_a_fee_vault,
+        &ctx.accounts.creator_wallet,
+        &ctx.accounts.protocol_wallet,
+        &ctx.accounts.creator_fee_account_a,
+        &ctx.accounts.protocol_fee_account_a,
+        &ctx.accounts.keeper_fee_account_a,
+    )?;
+    validate_fee_destinations(
+        &ctx.accounts.pool,
+        &ctx.accounts.config,
+        &ctx.accounts.token_b_fee_vault,
+        &ctx.accounts.creator_wallet,
+        &ctx.accounts.protocol_wallet,
+        &ctx.accounts.creator_fee_account_b,
+        &ctx.accounts.protocol_fee_account_b,
+        &ctx.accounts.keeper_fee_account_b,
+    )?;
+
     let pool = ctx.accounts.buyback_state.pool;
     let lp_custody_bump = ctx.bumps.lp_custody;
     let lp_custody_signer: &[&[&[u8]]] = &[&[
@@ -244,14 +339,25 @@ pub fn handle_harvest_and_split_lp_fees(ctx: Context<HarvestAndSplitLpFees>) -> 
         .checked_sub(before_b)
         .ok_or(LaunchpadError::MathUnderflow)?;
 
+    let (protocol_fee_bps_a, keeper_fee_bps_a) = keeper_fee_split_for_mint(
+        ctx.accounts.token_a_mint.key(),
+        ctx.accounts.buyback_state.protocol_fee_bps,
+        ctx.accounts.buyback_state.keeper_fee_bps,
+    );
+    let (protocol_fee_bps_b, keeper_fee_bps_b) = keeper_fee_split_for_mint(
+        ctx.accounts.token_b_mint.key(),
+        ctx.accounts.buyback_state.protocol_fee_bps,
+        ctx.accounts.buyback_state.keeper_fee_bps,
+    );
+
     split_one_side(
         ctx.accounts.token_program.to_account_info(),
         ctx.accounts.buyback_state.to_account_info(),
         pool,
         ctx.accounts.buyback_state.bump,
         ctx.accounts.buyback_state.creator_fee_bps,
-        ctx.accounts.buyback_state.protocol_fee_bps,
-        ctx.accounts.buyback_state.keeper_fee_bps,
+        protocol_fee_bps_a,
+        keeper_fee_bps_a,
         ctx.accounts.token_a_fee_vault.to_account_info(),
         ctx.accounts.creator_fee_account_a.to_account_info(),
         ctx.accounts.protocol_fee_account_a.to_account_info(),
@@ -265,8 +371,8 @@ pub fn handle_harvest_and_split_lp_fees(ctx: Context<HarvestAndSplitLpFees>) -> 
         pool,
         ctx.accounts.buyback_state.bump,
         ctx.accounts.buyback_state.creator_fee_bps,
-        ctx.accounts.buyback_state.protocol_fee_bps,
-        ctx.accounts.buyback_state.keeper_fee_bps,
+        protocol_fee_bps_b,
+        keeper_fee_bps_b,
         ctx.accounts.token_b_fee_vault.to_account_info(),
         ctx.accounts.creator_fee_account_b.to_account_info(),
         ctx.accounts.protocol_fee_account_b.to_account_info(),
@@ -291,6 +397,23 @@ pub fn handle_harvest_and_split_lp_fees(ctx: Context<HarvestAndSplitLpFees>) -> 
 }
 
 pub fn handle_split_claimed_fees(ctx: Context<SplitClaimedFees>) -> Result<()> {
+    validate_fee_destinations(
+        &ctx.accounts.pool,
+        &ctx.accounts.config,
+        &ctx.accounts.lp_fee_vault,
+        &ctx.accounts.creator_wallet,
+        &ctx.accounts.protocol_wallet,
+        &ctx.accounts.creator_fee_account,
+        &ctx.accounts.protocol_fee_account,
+        &ctx.accounts.keeper_fee_account,
+    )?;
+
+    let (protocol_fee_bps, keeper_fee_bps) = keeper_fee_split_for_mint(
+        ctx.accounts.lp_fee_vault.mint,
+        ctx.accounts.buyback_state.protocol_fee_bps,
+        ctx.accounts.buyback_state.keeper_fee_bps,
+    );
+
     let claimed = ctx.accounts.lp_fee_vault.amount;
     split_one_side(
         ctx.accounts.token_program.to_account_info(),
@@ -298,8 +421,8 @@ pub fn handle_split_claimed_fees(ctx: Context<SplitClaimedFees>) -> Result<()> {
         ctx.accounts.buyback_state.pool,
         ctx.accounts.buyback_state.bump,
         ctx.accounts.buyback_state.creator_fee_bps,
-        ctx.accounts.buyback_state.protocol_fee_bps,
-        ctx.accounts.buyback_state.keeper_fee_bps,
+        protocol_fee_bps,
+        keeper_fee_bps,
         ctx.accounts.lp_fee_vault.to_account_info(),
         ctx.accounts.creator_fee_account.to_account_info(),
         ctx.accounts.protocol_fee_account.to_account_info(),
@@ -394,6 +517,95 @@ fn split_one_side<'info>(
     Ok(())
 }
 
+fn validate_fee_destinations(
+    pool: &UncheckedAccount<'_>,
+    config: &GlobalConfig,
+    fee_vault: &TokenAccount,
+    creator_wallet: &UncheckedAccount<'_>,
+    protocol_wallet: &UncheckedAccount<'_>,
+    creator_fee_account: &Account<'_, TokenAccount>,
+    protocol_fee_account: &Account<'_, TokenAccount>,
+    keeper_fee_account: &Account<'_, TokenAccount>,
+) -> Result<()> {
+    let pool_creator = parse_pool_creator(pool)?;
+
+    require!(
+        creator_wallet.key() == pool_creator,
+        LaunchpadError::UnauthorizedCreator
+    );
+    require!(
+        protocol_wallet.key() == config.platform_wallet,
+        LaunchpadError::InvalidFeeConfig
+    );
+
+    validate_fee_destination_account(
+        &creator_fee_account.key(),
+        &creator_fee_account.owner,
+        &creator_fee_account.mint,
+        &creator_wallet.key(),
+        &fee_vault.mint,
+    )?;
+    validate_fee_destination_account(
+        &protocol_fee_account.key(),
+        &protocol_fee_account.owner,
+        &protocol_fee_account.mint,
+        &protocol_wallet.key(),
+        &fee_vault.mint,
+    )?;
+    validate_fee_destination_account(
+        &keeper_fee_account.key(),
+        &keeper_fee_account.owner,
+        &keeper_fee_account.mint,
+        &config.keeper_wallet,
+        &fee_vault.mint,
+    )?;
+
+    Ok(())
+}
+
+fn validate_fee_destination_account(
+    destination_key: &Pubkey,
+    actual_owner: &Pubkey,
+    actual_mint: &Pubkey,
+    expected_owner: &Pubkey,
+    expected_mint: &Pubkey,
+) -> Result<()> {
+    require!(
+        *actual_owner == *expected_owner,
+        LaunchpadError::InvalidFeeConfig
+    );
+    require!(
+        *actual_mint == *expected_mint,
+        LaunchpadError::InvalidPoolParams
+    );
+    require!(
+        *destination_key == get_associated_token_address(expected_owner, expected_mint),
+        LaunchpadError::InvalidFeeConfig
+    );
+    Ok(())
+}
+
+fn keeper_fee_split_for_mint(
+    mint: Pubkey,
+    protocol_fee_bps: u16,
+    keeper_fee_bps: u16,
+) -> (u16, u16) {
+    if mint == anchor_spl::token::spl_token::native_mint::id() {
+        (protocol_fee_bps, keeper_fee_bps)
+    } else {
+        (protocol_fee_bps.saturating_add(keeper_fee_bps), 0)
+    }
+}
+
+fn parse_pool_creator(pool: &UncheckedAccount<'_>) -> Result<Pubkey> {
+    let data = pool.try_borrow_data()?;
+    require!(data.len() >= 40, LaunchpadError::InvalidPoolParams);
+    let creator_bytes: [u8; 32] = data[8..40]
+        .try_into()
+        .map_err(|_| error!(LaunchpadError::InvalidPoolParams))?;
+    Ok(Pubkey::new_from_array(creator_bytes))
+}
+
 pub fn fee_split_is_valid(
     creator_fee_bps: u16,
     protocol_fee_bps: u16,
@@ -434,5 +646,68 @@ mod tests {
         assert_eq!(keeper, 0);
         assert_eq!(protocol, 31);
         assert_eq!(creator + protocol + keeper, total);
+    }
+
+    #[test]
+    fn attacker_cannot_redirect_fees() {
+        let mint = Pubkey::new_unique();
+        let attacker = Pubkey::new_unique();
+        let redirected_key = get_associated_token_address(&attacker, &mint);
+
+        let result = validate_fee_destination_account(
+            &redirected_key,
+            &attacker,
+            &mint,
+            &crate::state::KEEPER_WALLET,
+            &mint,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn correct_keeper_wallet_receives_fees() {
+        let mint = Pubkey::new_unique();
+        let ata = get_associated_token_address(&crate::state::KEEPER_WALLET, &mint);
+
+        let result = validate_fee_destination_account(
+            &ata,
+            &crate::state::KEEPER_WALLET,
+            &mint,
+            &crate::state::KEEPER_WALLET,
+            &mint,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn wrong_mint_fails() {
+        let expected_mint = Pubkey::new_unique();
+        let actual_mint = Pubkey::new_unique();
+        let owner = Pubkey::new_unique();
+        let token_account = get_associated_token_address(&owner, &actual_mint);
+
+        let result = validate_fee_destination_account(
+            &token_account,
+            &owner,
+            &actual_mint,
+            &owner,
+            &expected_mint,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn keeper_fee_stays_on_wsol_side() {
+        let (protocol_bps, keeper_bps) =
+            keeper_fee_split_for_mint(anchor_spl::token::spl_token::native_mint::id(), 2950, 50);
+        assert_eq!(protocol_bps, 2950);
+        assert_eq!(keeper_bps, 50);
+    }
+
+    #[test]
+    fn non_wsol_keeper_fee_rolls_into_protocol() {
+        let (protocol_bps, keeper_bps) = keeper_fee_split_for_mint(Pubkey::new_unique(), 2950, 50);
+        assert_eq!(protocol_bps, 3000);
+        assert_eq!(keeper_bps, 0);
     }
 }

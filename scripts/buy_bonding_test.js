@@ -54,6 +54,7 @@ async function main() {
   );
 
   const config = await program.account.globalConfig.fetch(configPda);
+  const pool = await program.account.bondingCurvePool.fetch(poolPda);
   const buyerTokenAccount = await getOrCreateAssociatedTokenAccount(
     provider.connection,
     wallet.payer,
@@ -82,7 +83,7 @@ async function main() {
       solVault: solVaultPda,
       tokenVault: tokenVaultPda,
       buyerTokenAccount: buyerTokenAccount.address,
-      devWallet: config.devWallet,
+      creatorWallet: pool.creator,
       platformWallet: config.platformWallet,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
@@ -93,7 +94,7 @@ async function main() {
   const afterSolVaultLamports = await provider.connection.getBalance(solVaultPda);
   const afterBuyerToken = await getAccount(provider.connection, buyerTokenAccount.address);
   const afterTokenVault = await getAccount(provider.connection, tokenVaultPda);
-  const pool = await program.account.bondingCurvePool.fetch(poolPda);
+  const updatedPool = await program.account.bondingCurvePool.fetch(poolPda);
 
   console.log("Transaction:", signature);
   console.log("Buyer token before:", beforeBuyerToken.amount.toString());
@@ -105,8 +106,8 @@ async function main() {
   console.log("SOL vault after:", afterSolVaultLamports);
   console.log("Wallet SOL before:", beforeWalletLamports);
   console.log("Wallet SOL after:", afterWalletLamports);
-  console.log("Pool real SOL reserves:", pool.realSolReserves.toString());
-  console.log("Pool real token reserves:", pool.realTokenReserves.toString());
+  console.log("Pool real SOL reserves:", updatedPool.realSolReserves.toString());
+  console.log("Pool real token reserves:", updatedPool.realTokenReserves.toString());
   console.log("Buyer position:", buyerPositionPda.toBase58());
 }
 

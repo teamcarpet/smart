@@ -82,8 +82,10 @@ impl BuybackState {
     /// Presale uses `round_interval_seconds` instead.
     pub const MIN_BUYBACK_INTERVAL: u64 = 10;
 
-    /// Bonding curve: 20% of treasury each buyback cycle
-    pub const BONDING_BUYBACK_BPS: u64 = 2000;
+    /// Bonding curve: 1% of treasury each buyback cycle.
+    /// Keeps permissionless cranks deterministic while avoiding oversized
+    /// swaps that can push a fresh Meteora position outside its price range.
+    pub const BONDING_BUYBACK_BPS: u64 = 100;
 
     /// Grace window: allow a round to fire up to this many seconds early.
     /// Protects against bot-clock skew without letting anyone spam rounds.

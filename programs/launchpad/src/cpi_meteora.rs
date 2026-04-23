@@ -183,28 +183,30 @@ pub fn cpi_initialize_pool<'info>(
 
 /// Accounts required by Meteora's `swap` instruction.
 pub struct SwapAccounts<'info> {
+    /// Meteora pool authority
+    pub pool_authority: AccountInfo<'info>,
     /// Pool state
     pub pool: AccountInfo<'info>,
-    /// Input token vault (pool side)
-    pub input_vault: AccountInfo<'info>,
-    /// Output token vault (pool side)
-    pub output_vault: AccountInfo<'info>,
-    /// Input token mint
-    pub input_mint: AccountInfo<'info>,
-    /// Output token mint
-    pub output_mint: AccountInfo<'info>,
     /// User's input token account
-    pub user_input_token: AccountInfo<'info>,
+    pub input_token_account: AccountInfo<'info>,
     /// User's output token account
-    pub user_output_token: AccountInfo<'info>,
+    pub output_token_account: AccountInfo<'info>,
+    /// Token A vault (pool side)
+    pub token_a_vault: AccountInfo<'info>,
+    /// Token B vault (pool side)
+    pub token_b_vault: AccountInfo<'info>,
+    /// Token A mint
+    pub token_a_mint: AccountInfo<'info>,
+    /// Token B mint
+    pub token_b_mint: AccountInfo<'info>,
     /// User/authority (signer)
-    pub user: AccountInfo<'info>,
-    /// Protocol fee account
-    pub protocol_fee: AccountInfo<'info>,
-    /// Input token program
-    pub input_token_program: AccountInfo<'info>,
-    /// Output token program
-    pub output_token_program: AccountInfo<'info>,
+    pub payer: AccountInfo<'info>,
+    /// Token A program
+    pub token_a_program: AccountInfo<'info>,
+    /// Token B program
+    pub token_b_program: AccountInfo<'info>,
+    /// Meteora event authority
+    pub event_authority: AccountInfo<'info>,
     /// Meteora program
     pub meteora_program: AccountInfo<'info>,
 }
@@ -229,17 +231,22 @@ pub fn cpi_swap<'info>(
     data.extend_from_slice(&params.minimum_amount_out.to_le_bytes());
 
     let account_metas = vec![
+        AccountMeta::new_readonly(accounts.pool_authority.key(), false),
         AccountMeta::new(accounts.pool.key(), false),
-        AccountMeta::new(accounts.input_vault.key(), false),
-        AccountMeta::new(accounts.output_vault.key(), false),
-        AccountMeta::new_readonly(accounts.input_mint.key(), false),
-        AccountMeta::new_readonly(accounts.output_mint.key(), false),
-        AccountMeta::new(accounts.user_input_token.key(), false),
-        AccountMeta::new(accounts.user_output_token.key(), false),
-        AccountMeta::new(accounts.user.key(), true),
-        AccountMeta::new(accounts.protocol_fee.key(), false),
-        AccountMeta::new_readonly(accounts.input_token_program.key(), false),
-        AccountMeta::new_readonly(accounts.output_token_program.key(), false),
+        AccountMeta::new(accounts.input_token_account.key(), false),
+        AccountMeta::new(accounts.output_token_account.key(), false),
+        AccountMeta::new(accounts.token_a_vault.key(), false),
+        AccountMeta::new(accounts.token_b_vault.key(), false),
+        AccountMeta::new_readonly(accounts.token_a_mint.key(), false),
+        AccountMeta::new_readonly(accounts.token_b_mint.key(), false),
+        AccountMeta::new(accounts.payer.key(), true),
+        AccountMeta::new_readonly(accounts.token_a_program.key(), false),
+        AccountMeta::new_readonly(accounts.token_b_program.key(), false),
+        // Optional referral_token_account. Anchor clients represent None with
+        // the callee program id as a readonly placeholder.
+        AccountMeta::new_readonly(accounts.meteora_program.key(), false),
+        AccountMeta::new_readonly(accounts.event_authority.key(), false),
+        AccountMeta::new_readonly(accounts.meteora_program.key(), false),
     ];
 
     let ix = Instruction {
@@ -249,17 +256,19 @@ pub fn cpi_swap<'info>(
     };
 
     let account_infos = &[
+        accounts.pool_authority.clone(),
         accounts.pool.clone(),
-        accounts.input_vault.clone(),
-        accounts.output_vault.clone(),
-        accounts.input_mint.clone(),
-        accounts.output_mint.clone(),
-        accounts.user_input_token.clone(),
-        accounts.user_output_token.clone(),
-        accounts.user.clone(),
-        accounts.protocol_fee.clone(),
-        accounts.input_token_program.clone(),
-        accounts.output_token_program.clone(),
+        accounts.input_token_account.clone(),
+        accounts.output_token_account.clone(),
+        accounts.token_a_vault.clone(),
+        accounts.token_b_vault.clone(),
+        accounts.token_a_mint.clone(),
+        accounts.token_b_mint.clone(),
+        accounts.payer.clone(),
+        accounts.token_a_program.clone(),
+        accounts.token_b_program.clone(),
+        accounts.meteora_program.clone(),
+        accounts.event_authority.clone(),
         accounts.meteora_program.clone(),
     ];
 
@@ -344,37 +353,59 @@ pub fn cpi_claim_position_fee<'info>(
 
 // ── Price helpers ────────────────────────────────────────────────────────
 
-/// Calculate initial sqrt_price for Meteora pool from bonding curve final state.
+/// Calculate initial sqrt_price for Meteora pool from launch liquidity.
 ///
-/// sqrt_price = sqrt(sol_reserves / token_reserves) * 2^64 (Q64.64 format)
+/// Meteora expects sqrt_price = sqrt(token_b / token_a) * 2^64, where token A
+/// is WSOL and token B is the launched token.
 ///
-/// Approach: sqrt_price = isqrt(sol) * 2^64 / isqrt(tokens)
+/// Approach: sqrt_price = isqrt(tokens) * 2^64 / isqrt(sol)
 /// This avoids the impossible `shl(128)` on u128.
 pub fn calculate_init_sqrt_price(sol_amount: u64, token_amount: u64) -> Result<u128> {
     require!(token_amount > 0, LaunchpadError::DivisionByZero);
     require!(sol_amount > 0, LaunchpadError::ZeroAmount);
 
-    // sqrt_price = sqrt(sol / tokens) * 2^64
-    // Split: = (sqrt(sol) / sqrt(tokens)) * 2^64
-    // = sqrt(sol) * 2^64 / sqrt(tokens)
-
     let sqrt_sol = isqrt_u128(sol_amount as u128);
     let sqrt_tokens = isqrt_u128(token_amount as u128);
 
-    require!(sqrt_tokens > 0, LaunchpadError::DivisionByZero);
+    require!(sqrt_sol > 0, LaunchpadError::DivisionByZero);
 
-    // sqrt_sol * 2^64 — this fits in u128 since sqrt_sol <= 2^32 and 2^32 * 2^64 = 2^96 < 2^128
-    let numerator = sqrt_sol
+    let numerator = sqrt_tokens
         .checked_mul(1u128 << 64)
         .ok_or(LaunchpadError::MathOverflow)?;
 
     let sqrt_price = numerator
-        .checked_div(sqrt_tokens)
+        .checked_div(sqrt_sol)
         .ok_or(LaunchpadError::DivisionByZero)?;
 
     require!(sqrt_price > 0, LaunchpadError::ZeroAmount);
 
     Ok(sqrt_price)
+}
+
+/// Derive a full-range liquidity delta compatible with Meteora's
+/// `initialize_pool` math.
+pub fn calculate_initial_liquidity(
+    sol_amount: u64,
+    token_amount: u64,
+    sqrt_price: u128,
+) -> Result<u128> {
+    require!(sol_amount > 0, LaunchpadError::ZeroAmount);
+    require!(token_amount > 0, LaunchpadError::ZeroAmount);
+    require!(sqrt_price > 0, LaunchpadError::ZeroAmount);
+
+    let q64 = 1u128 << 64;
+    let liquidity_from_a = (sol_amount as u128)
+        .checked_mul(sqrt_price)
+        .ok_or(LaunchpadError::MathOverflow)?;
+    let liquidity_from_b = (token_amount as u128)
+        .checked_mul(q64)
+        .ok_or(LaunchpadError::MathOverflow)?
+        .checked_div(sqrt_price)
+        .ok_or(LaunchpadError::DivisionByZero)?;
+
+    let liquidity = liquidity_from_a.min(liquidity_from_b);
+    require!(liquidity > 0, LaunchpadError::ZeroAmount);
+    Ok(liquidity)
 }
 
 /// Integer square root for u128.
@@ -416,9 +447,8 @@ mod tests {
         .unwrap();
 
         assert!(sqrt_price > 0);
-        // sqrt(100e9 / 1e15) * 2^64 = sqrt(1e-4) * 2^64 = 0.01 * 2^64 ≈ 1.84e17
-        // Our integer sqrt approach gives approximate value
-        assert!(sqrt_price > 1_000_000_000_000_000); // > 1e15 (sanity)
+        // sqrt(1e15 / 100e9) * 2^64 = 100 * 2^64-ish
+        assert!(sqrt_price > (1u128 << 64));
     }
 
     #[test]
@@ -428,5 +458,13 @@ mod tests {
         // Should be close to 2^64 = 18446744073709551616
         assert!(sqrt_price > 18_000_000_000_000_000_000u128);
         assert!(sqrt_price < 19_000_000_000_000_000_000u128);
+    }
+
+    #[test]
+    fn test_initial_liquidity_is_non_zero() {
+        let sqrt_price = calculate_init_sqrt_price(4_000_000_000, 800_000_000_000_000).unwrap();
+        let liquidity =
+            calculate_initial_liquidity(4_000_000_000, 800_000_000_000_000, sqrt_price).unwrap();
+        assert!(liquidity > 0);
     }
 }

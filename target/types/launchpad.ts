@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/launchpad.json`.
  */
 export type Launchpad = {
-  "address": "J4uWb4jjz8VmXCGMWNjM6Tp3rqGv69Sd7SKoMtzsV3fF",
+  "address": "DywpVp5YfLiX4M3xfEp333Y2dmq8xywdNAYaWDw6v9XV",
   "metadata": {
     "name": "launchpad",
     "version": "0.1.0",
@@ -236,7 +236,7 @@ export type Launchpad = {
           "writable": true
         },
         {
-          "name": "devWallet",
+          "name": "creatorWallet",
           "writable": true
         },
         {
@@ -400,6 +400,24 @@ export type Launchpad = {
           "signer": true
         },
         {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "buybackState",
           "writable": true,
           "pda": {
@@ -458,6 +476,15 @@ export type Launchpad = {
               }
             ]
           }
+        },
+        {
+          "name": "creatorWallet"
+        },
+        {
+          "name": "protocolWallet"
+        },
+        {
+          "name": "pool"
         },
         {
           "name": "creatorFeeAccount",
@@ -1213,6 +1240,9 @@ export type Launchpad = {
           "writable": true
         },
         {
+          "name": "meteoraPoolAuthority"
+        },
+        {
           "name": "meteoraInputVault",
           "docs": [
             "Meteora input vault (SOL/WSOL side)"
@@ -1237,8 +1267,7 @@ export type Launchpad = {
           "writable": true
         },
         {
-          "name": "protocolFee",
-          "writable": true
+          "name": "meteoraEventAuthority"
         },
         {
           "name": "tokenProgram",
@@ -1277,6 +1306,24 @@ export type Launchpad = {
           "name": "payer",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "buybackState",
@@ -1397,6 +1444,15 @@ export type Launchpad = {
               }
             ]
           }
+        },
+        {
+          "name": "creatorWallet"
+        },
+        {
+          "name": "protocolWallet"
+        },
+        {
+          "name": "pool"
         },
         {
           "name": "creatorFeeAccountA",
@@ -2567,6 +2623,10 @@ export type Launchpad = {
           "writable": true
         },
         {
+          "name": "creatorWallet",
+          "writable": true
+        },
+        {
           "name": "platformWallet",
           "docs": [
             "Platform wallet receives platform fee"
@@ -2610,6 +2670,24 @@ export type Launchpad = {
           "name": "payer",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "buybackState",
@@ -2670,6 +2748,15 @@ export type Launchpad = {
               }
             ]
           }
+        },
+        {
+          "name": "creatorWallet"
+        },
+        {
+          "name": "protocolWallet"
+        },
+        {
+          "name": "pool"
         },
         {
           "name": "creatorFeeAccount",
@@ -2774,6 +2861,55 @@ export type Launchpad = {
               "name": "updateConfigParams"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "upgradeConfigV2",
+      "discriminator": [
+        19,
+        182,
+        14,
+        42,
+        207,
+        154,
+        117,
+        88
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "keeperFeeBps",
+          "type": "u16"
         }
       ]
     }
@@ -3759,6 +3895,13 @@ export type Launchpad = {
             "type": "u16"
           },
           {
+            "name": "keeperWallet",
+            "docs": [
+              "Fixed protocol keeper wallet for LP fee harvesting and rewards"
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "pendingAdmin",
             "docs": [
               "Pending admin for two-step transfer (Pubkey::default() = none)"
@@ -4151,7 +4294,7 @@ export type Launchpad = {
             "type": "u64"
           },
           {
-            "name": "devFee",
+            "name": "creatorFee",
             "type": "u64"
           },
           {
@@ -4188,6 +4331,10 @@ export type Launchpad = {
           },
           {
             "name": "solAmount",
+            "type": "u64"
+          },
+          {
+            "name": "creatorFee",
             "type": "u64"
           },
           {
