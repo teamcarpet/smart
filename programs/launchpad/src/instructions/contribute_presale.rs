@@ -70,6 +70,8 @@ pub fn handle_contribute_presale(ctx: Context<ContributePresale>, sol_amount: u6
     let (platform_fee, net_amount) =
         fees::calculate_presale_fee(sol_amount, ctx.accounts.config.presale_platform_fee_bps)?;
 
+    validate_presale_target_capacity(pool.current_raised, pool.migration_target, net_amount)?;
+
     // Check max contribution (1% of migration target)
     let max_contribution: u128 = (pool.migration_target as u128)
         .checked_mul(pool.max_buy_bps as u128)
@@ -167,4 +169,46 @@ pub fn handle_contribute_presale(ctx: Context<ContributePresale>, sol_amount: u6
     });
 
     Ok(())
+}
+
+fn validate_presale_target_capacity(
+    current_raised: u64,
+    migration_target: u64,
+    net_amount: u64,
+) -> Result<()> {
+    require!(current_raised < migration_target, LaunchpadError::TargetReached);
+
+    let remaining = migration_target
+        .checked_sub(current_raised)
+        .ok_or(LaunchpadError::MathUnderflow)?;
+
+    require!(
+        net_amount <= remaining,
+        LaunchpadError::ContributionExceedsTarget
+    );
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exact_target_contribution_is_allowed() {
+        let result = validate_presale_target_capacity(99, 100, 1);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn over_target_contribution_is_rejected() {
+        let result = validate_presale_target_capacity(99, 100, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn contributions_stop_after_target_is_reached() {
+        let result = validate_presale_target_capacity(100, 100, 1);
+        assert!(result.is_err());
+    }
 }

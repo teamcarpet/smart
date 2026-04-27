@@ -128,10 +128,6 @@ pub struct MigrateBonding<'info> {
     #[account(mut)]
     pub position_account: UncheckedAccount<'info>,
 
-    /// CHECK: Position NFT metadata (Metaplex)
-    #[account(mut)]
-    pub position_nft_metadata: UncheckedAccount<'info>,
-
     /// CHECK: Meteora token vault A (SOL/WSOL side), initialized by Meteora CPI
     #[account(mut)]
     pub meteora_vault_a: UncheckedAccount<'info>,
@@ -139,6 +135,12 @@ pub struct MigrateBonding<'info> {
     /// CHECK: Meteora token vault B (token side), initialized by Meteora CPI
     #[account(mut)]
     pub meteora_vault_b: UncheckedAccount<'info>,
+
+    /// CHECK: Meteora token badge PDA for WSOL mint.
+    pub meteora_token_a_badge: UncheckedAccount<'info>,
+
+    /// CHECK: Meteora token badge PDA for launch token mint.
+    pub meteora_token_b_badge: UncheckedAccount<'info>,
 
     /// C-7: WSOL mint — validated to be the canonical native mint
     /// CHECK: Hardcoded address validation
@@ -323,6 +325,8 @@ pub fn handle_migrate_bonding(ctx: Context<MigrateBonding>) -> Result<()> {
         system_program: ctx.accounts.system_program.to_account_info(),
         event_authority: ctx.accounts.meteora_event_authority.to_account_info(),
         meteora_program: ctx.accounts.meteora_program.to_account_info(),
+        token_a_badge: ctx.accounts.meteora_token_a_badge.to_account_info(),
+        token_b_badge: ctx.accounts.meteora_token_b_badge.to_account_info(),
     };
 
     let meteora_params = InitializePoolParams {

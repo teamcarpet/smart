@@ -13,7 +13,7 @@ use crate::state::{BuybackState, GlobalConfig, PresalePool};
 
 #[derive(Accounts)]
 pub struct MigratePresale<'info> {
-    /// C-6: Only admin can trigger migration
+    /// Anyone can permissionlessly migrate once the target is reached.
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -21,7 +21,6 @@ pub struct MigratePresale<'info> {
         seeds = [GlobalConfig::SEED],
         bump = config.bump,
         constraint = !config.is_paused @ LaunchpadError::PlatformPaused,
-        constraint = config.admin == payer.key() @ LaunchpadError::UnauthorizedAdmin,
     )]
     pub config: Box<Account<'info, GlobalConfig>>,
 
@@ -132,10 +131,6 @@ pub struct MigratePresale<'info> {
     #[account(mut)]
     pub position_account: UncheckedAccount<'info>,
 
-    /// CHECK: Position NFT metadata
-    #[account(mut)]
-    pub position_nft_metadata: UncheckedAccount<'info>,
-
     /// CHECK: Meteora token vault A (SOL/WSOL), initialized by Meteora CPI
     #[account(mut)]
     pub meteora_vault_a: UncheckedAccount<'info>,
@@ -143,6 +138,12 @@ pub struct MigratePresale<'info> {
     /// CHECK: Meteora token vault B (token), initialized by Meteora CPI
     #[account(mut)]
     pub meteora_vault_b: UncheckedAccount<'info>,
+
+    /// CHECK: Meteora token badge PDA for WSOL mint.
+    pub meteora_token_a_badge: UncheckedAccount<'info>,
+
+    /// CHECK: Meteora token badge PDA for launch token mint.
+    pub meteora_token_b_badge: UncheckedAccount<'info>,
 
     /// C-7: WSOL mint validated
     /// CHECK: Hardcoded address
@@ -185,6 +186,11 @@ pub struct MigratePresale<'info> {
 pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
     let pool = &ctx.accounts.pool;
     let config = &ctx.accounts.config;
+
+    require!(
+        presale_can_migrate_permissionlessly(pool.current_raised, pool.migration_target),
+        LaunchpadError::MigrationTargetNotReached
+    );
 
     // ── CALCULATE SPLITS ────────────────────────────────────────────
     let total_sol = pool.current_raised;
@@ -335,6 +341,8 @@ pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
         system_program: ctx.accounts.system_program.to_account_info(),
         event_authority: ctx.accounts.meteora_event_authority.to_account_info(),
         meteora_program: ctx.accounts.meteora_program.to_account_info(),
+        token_a_badge: ctx.accounts.meteora_token_a_badge.to_account_info(),
+        token_b_badge: ctx.accounts.meteora_token_b_badge.to_account_info(),
     };
 
     cpi_meteora::cpi_initialize_pool(
@@ -381,6 +389,10 @@ fn calculate_presale_sol_split(
     Ok((migration_fee, liquidity_sol, creator_sol, buyback_sol))
 }
 
+fn presale_can_migrate_permissionlessly(current_raised: u64, migration_target: u64) -> bool {
+    current_raised >= migration_target
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,5 +408,12 @@ mod tests {
         assert_eq!(creator, 20_000_000_000);
         assert_eq!(buyback, 59_000_000_000);
         assert_eq!(fee + liquidity + creator + buyback, total_sol);
+    }
+
+    #[test]
+    fn presale_migration_becomes_permissionless_once_target_is_reached() {
+        assert!(!presale_can_migrate_permissionlessly(99, 100));
+        assert!(presale_can_migrate_permissionlessly(100, 100));
+        assert!(presale_can_migrate_permissionlessly(101, 100));
     }
 }

@@ -57,6 +57,9 @@ pub enum LaunchpadError {
     #[msg("Slippage tolerance exceeded")]
     SlippageExceeded,
 
+    #[msg("Minimum output must be greater than zero")]
+    InvalidMinTokensOut,
+
     #[msg("Amount must be greater than zero")]
     ZeroAmount,
 
@@ -69,6 +72,9 @@ pub enum LaunchpadError {
 
     #[msg("Contribution exceeds max 1% per wallet")]
     ExceedsMaxContribution,
+
+    #[msg("Contribution exceeds remaining presale target")]
+    ContributionExceedsTarget,
 
     #[msg("Tokens already claimed")]
     AlreadyClaimed,
