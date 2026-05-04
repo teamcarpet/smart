@@ -4,7 +4,7 @@ use anchor_spl::token::{self, Burn, Mint, SyncNative, Token, TokenAccount};
 use crate::cpi_meteora::{self, SwapAccounts, SwapParams, METEORA_PROGRAM_ID, POOL_AUTHORITY};
 use crate::errors::LaunchpadError;
 use crate::events::BuybackExecuted;
-use crate::state::{BuybackMode, BuybackState};
+use crate::state::{BuybackMode, BuybackState, GlobalConfig};
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct ExecuteBuybackParams {
@@ -23,6 +23,14 @@ pub struct ExecuteBuyback<'info> {
     /// Anyone can trigger buyback (permissionless crank)
     #[account(mut)]
     pub payer: Signer<'info>,
+
+    #[account(
+        seeds = [GlobalConfig::SEED],
+        bump = config.bump,
+        constraint = !config.is_paused @ LaunchpadError::PlatformPaused,
+        constraint = payer.key() == config.keeper_wallet @ LaunchpadError::UnauthorizedAdmin,
+    )]
+    pub config: Box<Account<'info, GlobalConfig>>,
 
     #[account(
         mut,
@@ -121,7 +129,14 @@ pub fn handle_execute_buyback(
 
     // ── CHECKS ──────────────────────────────────────────────────────
 
-    require!(params.min_tokens_out > 0, LaunchpadError::InvalidMinTokensOut);
+    require!(
+        params.min_tokens_out > 0,
+        LaunchpadError::InvalidMinTokensOut
+    );
+    require!(
+        buyback_caller_is_authorized(ctx.accounts.payer.key(), ctx.accounts.config.keeper_wallet),
+        LaunchpadError::UnauthorizedAdmin
+    );
 
     require!(
         buyback.pool_type == 0 || buyback.pool_type == 1,
@@ -156,12 +171,14 @@ pub fn handle_execute_buyback(
             );
         }
 
-        let amount: u128 = (buyback.treasury_balance as u128)
+        let amount: u128 = (buyback.initial_treasury as u128)
             .checked_mul(BuybackState::BONDING_BUYBACK_BPS as u128)
             .ok_or(LaunchpadError::MathOverflow)?
             .checked_div(10_000u128)
             .ok_or(LaunchpadError::DivisionByZero)?;
-        u64::try_from(amount).map_err(|_| LaunchpadError::CastOverflow)?
+        u64::try_from(amount)
+            .map_err(|_| LaunchpadError::CastOverflow)?
+            .min(buyback.treasury_balance)
     } else {
         // Presale: scheduled round check
         require!(
@@ -383,6 +400,11 @@ pub fn handle_execute_buyback(
     Ok(())
 }
 
+fn buyback_caller_is_authorized(payer: Pubkey, keeper_wallet: Pubkey) -> bool {
+    payer == keeper_wallet
+}
+
+#[allow(clippy::too_many_arguments)]
 fn validate_buyback_accounts(
     program_id: &Pubkey,
     pool: Pubkey,
@@ -398,13 +420,13 @@ fn validate_buyback_accounts(
     meteora_event_authority: Pubkey,
 ) -> Result<()> {
     require!(pool_mint == buyback_mint, LaunchpadError::InvalidPoolParams);
-    require!(meteora_pool == stored_meteora_pool, LaunchpadError::InvalidPoolParams);
+    require!(
+        meteora_pool == stored_meteora_pool,
+        LaunchpadError::InvalidPoolParams
+    );
 
-    let expected_buyback_token_vault = Pubkey::find_program_address(
-        &[BUYBACK_TOKEN_VAULT_SEED, pool.as_ref()],
-        program_id,
-    )
-    .0;
+    let expected_buyback_token_vault =
+        Pubkey::find_program_address(&[BUYBACK_TOKEN_VAULT_SEED, pool.as_ref()], program_id).0;
     require!(
         buyback_token_vault == expected_buyback_token_vault,
         LaunchpadError::InvalidPoolParams
@@ -471,8 +493,7 @@ mod tests {
             Pubkey::new_unique(),
             mint,
             Pubkey::find_program_address(&[b"bonding_sol_vault", mint.as_ref()], &program_id).0,
-            Pubkey::find_program_address(&[BUYBACK_TOKEN_VAULT_SEED, pool.as_ref()], &program_id)
-                .0,
+            Pubkey::find_program_address(&[BUYBACK_TOKEN_VAULT_SEED, pool.as_ref()], &program_id).0,
             wrong_pool,
             cpi_meteora::derive_token_vault_address(&wsol, &wrong_pool),
             cpi_meteora::derive_token_vault_address(&mint, &wrong_pool),
@@ -504,5 +525,12 @@ mod tests {
             cpi_meteora::derive_event_authority(),
         );
         assert!(err.is_err());
+    }
+
+    #[test]
+    fn execute_buyback_requires_keeper_wallet() {
+        let keeper = crate::state::KEEPER_WALLET;
+        assert!(buyback_caller_is_authorized(keeper, keeper));
+        assert!(!buyback_caller_is_authorized(Pubkey::new_unique(), keeper));
     }
 }

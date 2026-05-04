@@ -3,7 +3,7 @@ use anchor_lang::solana_program::{program::invoke, system_instruction};
 
 use crate::errors::LaunchpadError;
 use crate::events::ConfigUpdated;
-use crate::state::{GlobalConfig, KEEPER_WALLET};
+use crate::state::{BondingCurvePool, GlobalConfig, KEEPER_WALLET};
 
 const CONFIG_DISCRIMINATOR_LEN: usize = 8;
 const LEGACY_CONFIG_SPACE: usize = 172;
@@ -21,7 +21,6 @@ const OLD_BUMP_OFFSET: usize = 183;
 const NEW_CREATOR_FEE_BPS_OFFSET: usize = 146;
 const NEW_PROTOCOL_FEE_BPS_OFFSET: usize = 148;
 const NEW_KEEPER_FEE_BPS_OFFSET: usize = 150;
-const CURRENT_KEEPER_FEE_BPS_OFFSET: usize = 150;
 const CURRENT_PENDING_ADMIN_OFFSET: usize = 152;
 const CURRENT_IS_PAUSED_OFFSET: usize = 184;
 const CURRENT_BUMP_OFFSET: usize = 185;
@@ -354,5 +353,59 @@ pub struct Unpause<'info> {
 pub fn handle_unpause(ctx: Context<Unpause>) -> Result<()> {
     ctx.accounts.config.is_paused = false;
     msg!("Platform unpaused by {}", ctx.accounts.authority.key());
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct PauseBondingPool<'info> {
+    #[account(
+        constraint = (
+            config.admin == authority.key() || config.pause_authority == authority.key()
+        ) @ LaunchpadError::UnauthorizedPauseAuthority
+    )]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [GlobalConfig::SEED],
+        bump = config.bump,
+    )]
+    pub config: Account<'info, GlobalConfig>,
+
+    #[account(
+        mut,
+        seeds = [BondingCurvePool::SEED, pool.mint.as_ref()],
+        bump = pool.bump,
+    )]
+    pub pool: Account<'info, BondingCurvePool>,
+}
+
+pub fn handle_pause_bonding_pool(ctx: Context<PauseBondingPool>) -> Result<()> {
+    ctx.accounts.pool.is_paused = true;
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct UnpauseBondingPool<'info> {
+    #[account(
+        constraint = config.admin == authority.key() @ LaunchpadError::UnauthorizedAdmin
+    )]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [GlobalConfig::SEED],
+        bump = config.bump,
+    )]
+    pub config: Account<'info, GlobalConfig>,
+
+    #[account(
+        mut,
+        seeds = [BondingCurvePool::SEED, pool.mint.as_ref()],
+        bump = pool.bump,
+    )]
+    pub pool: Account<'info, BondingCurvePool>,
+}
+
+pub fn handle_unpause_bonding_pool(ctx: Context<UnpauseBondingPool>) -> Result<()> {
+    ctx.accounts.pool.is_paused = false;
     Ok(())
 }

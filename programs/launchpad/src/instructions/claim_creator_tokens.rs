@@ -2,11 +2,18 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::errors::LaunchpadError;
-use crate::state::{BuybackState, PresalePool};
+use crate::state::{BuybackState, GlobalConfig, PresalePool};
 
 #[derive(Accounts)]
 pub struct ClaimCreatorTokens<'info> {
     pub creator: Signer<'info>,
+
+    #[account(
+        seeds = [GlobalConfig::SEED],
+        bump = config.bump,
+        constraint = !config.is_paused @ LaunchpadError::PlatformPaused,
+    )]
+    pub config: Account<'info, GlobalConfig>,
 
     #[account(
         seeds = [PresalePool::SEED, pool.mint.as_ref()],

@@ -41,6 +41,12 @@ pub enum LaunchpadError {
     #[msg("Migration target not reached")]
     MigrationTargetNotReached,
 
+    #[msg("Migration target already reached")]
+    MigrationTargetReached,
+
+    #[msg("Bonding sells are locked once migration target is reached")]
+    SellsLockedAtTarget,
+
     #[msg("Pool is not active")]
     PoolNotActive,
 
@@ -128,6 +134,9 @@ pub enum LaunchpadError {
 
     #[msg("LP position cannot be custodied by admin")]
     AdminLpCustody,
+
+    #[msg("LP position NFT custody is invalid")]
+    InvalidLpPositionCustody,
 
     #[msg("Creator token allocation already fully claimed")]
     NothingToClaim,

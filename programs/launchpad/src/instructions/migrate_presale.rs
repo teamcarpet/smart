@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::associated_token::{get_associated_token_address, AssociatedToken};
 use anchor_spl::token::{self, Mint, SyncNative, Token, TokenAccount};
 
 use crate::cpi_meteora::{
@@ -9,7 +9,9 @@ use crate::cpi_meteora::{
 use crate::errors::LaunchpadError;
 use crate::events::MigrationCompleted;
 use crate::math::fees;
-use crate::state::{BuybackState, GlobalConfig, PresalePool};
+use crate::state::{
+    BuybackState, GlobalConfig, PresalePool, ACTIVATION_DELAY_SLOTS, ALLOWED_METEORA_POOL_CONFIG,
+};
 
 #[derive(Accounts)]
 pub struct MigratePresale<'info> {
@@ -98,6 +100,10 @@ pub struct MigratePresale<'info> {
     pub meteora_pool: UncheckedAccount<'info>,
 
     /// CHECK: Meteora pool config
+    #[account(
+        constraint = meteora_pool_config.key() == ALLOWED_METEORA_POOL_CONFIG
+            @ LaunchpadError::InvalidPoolParams
+    )]
     pub meteora_pool_config: UncheckedAccount<'info>,
 
     /// CHECK: Meteora pool authority PDA
@@ -109,6 +115,10 @@ pub struct MigratePresale<'info> {
     pub token_2022_program: UncheckedAccount<'info>,
 
     /// CHECK: Meteora event authority PDA
+    #[account(
+        constraint = meteora_event_authority.key() == cpi_meteora::derive_event_authority()
+            @ LaunchpadError::InvalidPoolParams
+    )]
     pub meteora_event_authority: UncheckedAccount<'info>,
 
     /// CHECK: Program PDA that owns/custodies the LP position.
@@ -123,9 +133,17 @@ pub struct MigratePresale<'info> {
     #[account(mut)]
     pub position_nft_mint: Signer<'info>,
 
-    /// CHECK: Position NFT token account
-    #[account(mut)]
-    pub position_nft_account: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        constraint = position_nft_account.key()
+            == get_associated_token_address(&lp_custody.key(), &position_nft_mint.key())
+            @ LaunchpadError::InvalidLpPositionCustody,
+        constraint = position_nft_account.owner == lp_custody.key()
+            @ LaunchpadError::InvalidLpPositionCustody,
+        constraint = position_nft_account.mint == position_nft_mint.key()
+            @ LaunchpadError::InvalidLpPositionCustody,
+    )]
+    pub position_nft_account: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: Position account
     #[account(mut)]
@@ -350,10 +368,20 @@ pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
         &InitializePoolParams {
             liquidity: initial_liquidity,
             sqrt_price,
-            activation_point: None,
+            activation_point: Some(delayed_activation_slot(Clock::get()?.slot)?),
         },
         &[],
     )?;
+
+    ctx.accounts.position_nft_account.reload()?;
+    require!(
+        ctx.accounts.position_nft_account.owner == ctx.accounts.lp_custody.key(),
+        LaunchpadError::InvalidLpPositionCustody
+    );
+    require!(
+        ctx.accounts.position_nft_account.amount == 1,
+        LaunchpadError::InvalidLpPositionCustody
+    );
 
     // ── EVENTS ──────────────────────────────────────────────────────
 
@@ -393,6 +421,12 @@ fn presale_can_migrate_permissionlessly(current_raised: u64, migration_target: u
     current_raised >= migration_target
 }
 
+fn delayed_activation_slot(current_slot: u64) -> Result<u64> {
+    current_slot
+        .checked_add(ACTIVATION_DELAY_SLOTS)
+        .ok_or(LaunchpadError::MathOverflow.into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -415,5 +449,10 @@ mod tests {
         assert!(!presale_can_migrate_permissionlessly(99, 100));
         assert!(presale_can_migrate_permissionlessly(100, 100));
         assert!(presale_can_migrate_permissionlessly(101, 100));
+    }
+
+    #[test]
+    fn presale_migration_uses_activation_delay() {
+        assert_eq!(delayed_activation_slot(10).unwrap(), 160);
     }
 }

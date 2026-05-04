@@ -85,7 +85,7 @@ pub fn handle_contribute_presale(ctx: Context<ContributePresale>, sol_amount: u6
     let new_total = ctx
         .accounts
         .user_position
-        .sol_contributed
+        .amount
         .checked_add(net_amount)
         .ok_or(LaunchpadError::MathOverflow)?;
 
@@ -97,7 +97,7 @@ pub fn handle_contribute_presale(ctx: Context<ContributePresale>, sol_amount: u6
     // ── PRE-CAPTURE ───────────────────────────────────────────────
     let pool_key = ctx.accounts.pool.key();
     let contributor_key = ctx.accounts.contributor.key();
-    let is_new = ctx.accounts.user_position.sol_contributed == 0;
+    let is_new = ctx.accounts.user_position.amount == 0;
 
     // ── EFFECTS ─────────────────────────────────────────────────────
 
@@ -109,7 +109,7 @@ pub fn handle_contribute_presale(ctx: Context<ContributePresale>, sol_amount: u6
         ctx.accounts.user_position.refund_claimed = false;
         ctx.accounts.user_position.bump = ctx.bumps.user_position;
     }
-    ctx.accounts.user_position.sol_contributed = new_total;
+    ctx.accounts.user_position.amount = new_total;
 
     // Update pool
     ctx.accounts.pool.current_raised = ctx
@@ -176,7 +176,10 @@ fn validate_presale_target_capacity(
     migration_target: u64,
     net_amount: u64,
 ) -> Result<()> {
-    require!(current_raised < migration_target, LaunchpadError::TargetReached);
+    require!(
+        current_raised < migration_target,
+        LaunchpadError::TargetReached
+    );
 
     let remaining = migration_target
         .checked_sub(current_raised)

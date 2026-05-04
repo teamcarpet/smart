@@ -281,6 +281,24 @@ export type Launchpad = {
           "signer": true
         },
         {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "pool",
           "pda": {
             "seeds": [
@@ -521,6 +539,24 @@ export type Launchpad = {
         {
           "name": "user",
           "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "pool",
@@ -1145,6 +1181,24 @@ export type Launchpad = {
           ],
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "buybackState",
@@ -2310,6 +2364,74 @@ export type Launchpad = {
       "args": []
     },
     {
+      "name": "pauseBondingPool",
+      "discriminator": [
+        85,
+        157,
+        84,
+        143,
+        41,
+        129,
+        40,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.mint",
+                "account": "bondingCurvePool"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "proposeAdmin",
       "discriminator": [
         121,
@@ -2370,6 +2492,24 @@ export type Launchpad = {
           "name": "user",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "pool",
@@ -2821,6 +2961,74 @@ export type Launchpad = {
       "args": []
     },
     {
+      "name": "unpauseBondingPool",
+      "discriminator": [
+        242,
+        35,
+        63,
+        205,
+        49,
+        116,
+        12,
+        157
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.mint",
+                "account": "bondingCurvePool"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "updateConfig",
       "discriminator": [
         29,
@@ -3180,151 +3388,166 @@ export type Launchpad = {
     },
     {
       "code": 6012,
+      "name": "migrationTargetReached",
+      "msg": "Migration target already reached"
+    },
+    {
+      "code": 6013,
+      "name": "sellsLockedAtTarget",
+      "msg": "Bonding sells are locked once migration target is reached"
+    },
+    {
+      "code": 6014,
       "name": "poolNotActive",
       "msg": "Pool is not active"
     },
     {
-      "code": 6013,
+      "code": 6015,
       "name": "exceedsMaxBuy",
       "msg": "Buy amount exceeds max 1% per wallet"
     },
     {
-      "code": 6014,
+      "code": 6016,
       "name": "insufficientTokenReserves",
       "msg": "Insufficient token reserves"
     },
     {
-      "code": 6015,
+      "code": 6017,
       "name": "insufficientSolReserves",
       "msg": "Insufficient SOL reserves"
     },
     {
-      "code": 6016,
+      "code": 6018,
       "name": "slippageExceeded",
       "msg": "Slippage tolerance exceeded"
     },
     {
-      "code": 6017,
+      "code": 6019,
       "name": "invalidMinTokensOut",
       "msg": "Minimum output must be greater than zero"
     },
     {
-      "code": 6018,
+      "code": 6020,
       "name": "zeroAmount",
       "msg": "Amount must be greater than zero"
     },
     {
-      "code": 6019,
+      "code": 6021,
       "name": "presaleEnded",
       "msg": "Presale has ended"
     },
     {
-      "code": 6020,
+      "code": 6022,
       "name": "presaleNotEnded",
       "msg": "Presale has not ended yet"
     },
     {
-      "code": 6021,
+      "code": 6023,
       "name": "exceedsMaxContribution",
       "msg": "Contribution exceeds max 1% per wallet"
     },
     {
-      "code": 6022,
+      "code": 6024,
       "name": "contributionExceedsTarget",
       "msg": "Contribution exceeds remaining presale target"
     },
     {
-      "code": 6023,
+      "code": 6025,
       "name": "alreadyClaimed",
       "msg": "Tokens already claimed"
     },
     {
-      "code": 6024,
+      "code": 6026,
       "name": "alreadyRefunded",
       "msg": "Refund already claimed"
     },
     {
-      "code": 6025,
+      "code": 6027,
       "name": "targetReached",
       "msg": "Presale target was reached, no refund"
     },
     {
-      "code": 6026,
+      "code": 6028,
       "name": "invalidMigrationTarget",
       "msg": "Invalid migration target: must be 100-10000 SOL"
     },
     {
-      "code": 6027,
+      "code": 6029,
       "name": "invalidEndTime",
       "msg": "Invalid end time: must be in the future"
     },
     {
-      "code": 6028,
+      "code": 6030,
       "name": "buybackTooFrequent",
       "msg": "Buyback rate limit: too frequent"
     },
     {
-      "code": 6029,
+      "code": 6031,
       "name": "insufficientTreasury",
       "msg": "Insufficient treasury balance for buyback"
     },
     {
-      "code": 6030,
+      "code": 6032,
       "name": "invalidBuybackMode",
       "msg": "Invalid buyback mode"
     },
     {
-      "code": 6031,
+      "code": 6033,
       "name": "idleBuybackTokens",
       "msg": "Buyback left idle token balance"
     },
     {
-      "code": 6032,
+      "code": 6034,
       "name": "allRoundsExecuted",
       "msg": "All scheduled buyback rounds already executed"
     },
     {
-      "code": 6033,
+      "code": 6035,
       "name": "roundNotDue",
       "msg": "Next buyback round not yet due"
     },
     {
-      "code": 6034,
+      "code": 6036,
       "name": "invalidFeeConfig",
       "msg": "Invalid fee configuration"
     },
     {
-      "code": 6035,
+      "code": 6037,
       "name": "invalidPoolParams",
       "msg": "Invalid pool parameters"
     },
     {
-      "code": 6036,
+      "code": 6038,
       "name": "invalidMintSuffix",
       "msg": "Mint address must end with required launchpad suffix"
     },
     {
-      "code": 6037,
+      "code": 6039,
       "name": "mintFreezable",
       "msg": "Mint freeze authority must be revoked"
     },
     {
-      "code": 6038,
+      "code": 6040,
       "name": "unsafeMintAuthority",
       "msg": "Mint authority must be revoked or program controlled"
     },
     {
-      "code": 6039,
+      "code": 6041,
       "name": "adminLpCustody",
       "msg": "LP position cannot be custodied by admin"
     },
     {
-      "code": 6040,
+      "code": 6042,
+      "name": "invalidLpPositionCustody",
+      "msg": "LP position NFT custody is invalid"
+    },
+    {
+      "code": 6043,
       "name": "nothingToClaim",
       "msg": "Creator token allocation already fully claimed"
     },
     {
-      "code": 6041,
+      "code": 6044,
       "name": "creatorOverclaim",
       "msg": "Creator claim exceeds allocation"
     }
@@ -4464,9 +4687,11 @@ export type Launchpad = {
             "type": "pubkey"
           },
           {
-            "name": "solContributed",
+            "name": "amount",
             "docs": [
-              "Total SOL contributed (lamports)"
+              "Position amount.",
+              "Bonding pools use this as cumulative tokens bought.",
+              "Presale pools use this as cumulative SOL contributed."
             ],
             "type": "u64"
           },
