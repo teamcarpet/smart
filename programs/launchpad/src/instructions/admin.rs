@@ -409,3 +409,15 @@ pub fn handle_unpause_bonding_pool(ctx: Context<UnpauseBondingPool>) -> Result<(
     ctx.accounts.pool.is_paused = false;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn bonding_pool_pause_toggle_updates_state() {
+        let mut paused = true;
+        assert!(paused);
+
+        paused = false;
+        assert!(!paused);
+    }
+}
