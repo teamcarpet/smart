@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::errors::LaunchpadError;
 use crate::events::PresaleRefunded;
-use crate::state::{GlobalConfig, PresalePool, UserPosition};
+use crate::state::{require_presale_pool_active, GlobalConfig, PresalePool, UserPosition};
 
 #[derive(Accounts)]
 pub struct RefundPresale<'info> {
@@ -21,6 +21,7 @@ pub struct RefundPresale<'info> {
         seeds = [PresalePool::SEED, pool.mint.as_ref()],
         bump = pool.bump,
         constraint = !pool.is_migrated @ LaunchpadError::AlreadyMigrated,
+        constraint = !pool.is_paused @ LaunchpadError::PoolPaused,
     )]
     pub pool: Account<'info, PresalePool>,
 
@@ -47,6 +48,8 @@ pub struct RefundPresale<'info> {
 pub fn handle_refund_presale(ctx: Context<RefundPresale>) -> Result<()> {
     let pool = &ctx.accounts.pool;
     let position = &ctx.accounts.user_position;
+
+    require_presale_pool_active(pool.is_paused)?;
 
     // ── CHECKS ──────────────────────────────────────────────────────
 

@@ -83,16 +83,30 @@ This document summarizes the main security and correctness fixes applied in the 
 
 11. Pool-level pause controls
 - Added `pause_bonding_pool` and `unpause_bonding_pool`.
+- Added `pause_presale_pool` and `unpause_presale_pool`.
 - Files:
   - `programs/launchpad/src/instructions/admin.rs`
   - `programs/launchpad/src/lib.rs`
+  - `programs/launchpad/src/state/presale_pool.rs`
+  - `programs/launchpad/src/instructions/create_presale_pool.rs`
+  - `programs/launchpad/src/instructions/contribute_presale.rs`
+  - `programs/launchpad/src/instructions/claim_presale.rs`
+  - `programs/launchpad/src/instructions/refund_presale.rs`
+  - `programs/launchpad/src/instructions/migrate_presale.rs`
+  - `programs/launchpad/src/instructions/claim_creator_tokens.rs`
 
 12. Bonding buyback base
 - Bonding buybacks now spend from `initial_treasury` as the fixed basis and cap by remaining `treasury_balance`.
 - Files:
   - `programs/launchpad/src/instructions/execute_buyback.rs`
 
-13. Meteora account validation
+13. Burn-only buyback mode
+- `BuybackMode` is burn-only and has no live `AddLiquidity` branch.
+- Files:
+  - `programs/launchpad/src/state/buyback.rs`
+  - `programs/launchpad/src/instructions/execute_buyback.rs`
+
+14. Meteora account validation
 - Enforced derived Meteora event authority checks.
 - Whitelisted the allowed Meteora pool config address.
 - Files:
@@ -101,15 +115,31 @@ This document summarizes the main security and correctness fixes applied in the 
   - `programs/launchpad/src/instructions/migrate_presale.rs`
   - `programs/launchpad/src/instructions/execute_buyback.rs`
 
-14. Refund cleanup
+15. Refund cleanup
 - Refund path now zeroes the position amount after refund.
 - Files:
   - `programs/launchpad/src/instructions/refund_presale.rs`
 
-15. Virtual token validation
+16. Virtual token validation
 - Bonding creation now requires `virtual_tokens == token_supply`.
 - Files:
   - `programs/launchpad/src/instructions/create_bonding_pool.rs`
+
+## Files Changed In Final Cleanup
+
+- `programs/launchpad/src/errors.rs`
+- `programs/launchpad/src/state/presale_pool.rs`
+- `programs/launchpad/src/instructions/create_presale_pool.rs`
+- `programs/launchpad/src/instructions/contribute_presale.rs`
+- `programs/launchpad/src/instructions/claim_presale.rs`
+- `programs/launchpad/src/instructions/refund_presale.rs`
+- `programs/launchpad/src/instructions/claim_creator_tokens.rs`
+- `programs/launchpad/src/instructions/migrate_presale.rs`
+- `programs/launchpad/src/instructions/execute_buyback.rs`
+- `programs/launchpad/src/instructions/admin.rs`
+- `programs/launchpad/src/lib.rs`
+- `tests/launchpad.ts`
+- `README.md`
 
 ## Tests Added or Updated
 
@@ -119,20 +149,25 @@ This document summarizes the main security and correctness fixes applied in the 
 - LP custody ATA differs from payer ATA
 - Migration activation delay
 - Keeper-only buyback caller
+- Buyback rejects execution while globally paused
+- Bonding buyback uses `initial_treasury` and caps by remaining balance
+- No stale `AddLiquidity` buyback branch
 - Refund resets position amount
 - Bonding migration now uses all remaining tokens
+- Presale pool pause toggle
+- Presale pool paused-state guard helper
+- Anchor integration tests updated for current presale layout and entrypoints
 
 ## Verification
 
 - `cargo test --manifest-path programs/launchpad/Cargo.toml`
 - `cargo clippy --manifest-path programs/launchpad/Cargo.toml -- -D warnings`
 - `cargo fmt --manifest-path programs/launchpad/Cargo.toml --all`
+- `anchor build`
+- `anchor test`
 
-## Remaining Follow-Up
+## Remaining Assumptions
 
-The following items still deserve a dedicated follow-up before mainnet if we want complete closure:
-
-- explicit presale-claim dust handling policy
-- explicit SOL dust draining policy after migration
-- broader invariant/fuzz coverage
-- environment-stable `anchor test` execution in CI/local test runner
+- Buyback remains intentionally burn-only.
+- Presale account sizing is now pinned explicitly via `PresalePool::SPACE`.
+- The local Anchor suite is green; CI should still run the same commands in a clean environment before mainnet.

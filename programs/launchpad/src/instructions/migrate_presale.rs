@@ -10,7 +10,8 @@ use crate::errors::LaunchpadError;
 use crate::events::MigrationCompleted;
 use crate::math::fees;
 use crate::state::{
-    BuybackState, GlobalConfig, PresalePool, ACTIVATION_DELAY_SLOTS, ALLOWED_METEORA_POOL_CONFIG,
+    require_presale_pool_active, BuybackState, GlobalConfig, PresalePool, ACTIVATION_DELAY_SLOTS,
+    ALLOWED_METEORA_POOL_CONFIG,
 };
 
 #[derive(Accounts)]
@@ -31,6 +32,7 @@ pub struct MigratePresale<'info> {
         seeds = [PresalePool::SEED, pool.mint.as_ref()],
         bump = pool.bump,
         constraint = !pool.is_migrated @ LaunchpadError::AlreadyMigrated,
+        constraint = !pool.is_paused @ LaunchpadError::PoolPaused,
         constraint = pool.current_raised >= pool.migration_target
             @ LaunchpadError::MigrationTargetNotReached,
     )]
@@ -204,6 +206,8 @@ pub struct MigratePresale<'info> {
 pub fn handle_migrate_presale(ctx: Context<MigratePresale>) -> Result<()> {
     let pool = &ctx.accounts.pool;
     let config = &ctx.accounts.config;
+
+    require_presale_pool_active(pool.is_paused)?;
 
     require!(
         presale_can_migrate_permissionlessly(pool.current_raised, pool.migration_target),

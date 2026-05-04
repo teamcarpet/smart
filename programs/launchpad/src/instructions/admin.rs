@@ -3,7 +3,7 @@ use anchor_lang::solana_program::{program::invoke, system_instruction};
 
 use crate::errors::LaunchpadError;
 use crate::events::ConfigUpdated;
-use crate::state::{BondingCurvePool, GlobalConfig, KEEPER_WALLET};
+use crate::state::{BondingCurvePool, GlobalConfig, PresalePool, KEEPER_WALLET};
 
 const CONFIG_DISCRIMINATOR_LEN: usize = 8;
 const LEGACY_CONFIG_SPACE: usize = 172;
@@ -410,10 +410,71 @@ pub fn handle_unpause_bonding_pool(ctx: Context<UnpauseBondingPool>) -> Result<(
     Ok(())
 }
 
+#[derive(Accounts)]
+pub struct PausePresalePool<'info> {
+    #[account(
+        constraint = config.admin == authority.key() @ LaunchpadError::UnauthorizedAdmin
+    )]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [GlobalConfig::SEED],
+        bump = config.bump,
+    )]
+    pub config: Account<'info, GlobalConfig>,
+
+    #[account(
+        mut,
+        seeds = [PresalePool::SEED, pool.mint.as_ref()],
+        bump = pool.bump,
+    )]
+    pub pool: Account<'info, PresalePool>,
+}
+
+pub fn handle_pause_presale_pool(ctx: Context<PausePresalePool>) -> Result<()> {
+    ctx.accounts.pool.is_paused = true;
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct UnpausePresalePool<'info> {
+    #[account(
+        constraint = config.admin == authority.key() @ LaunchpadError::UnauthorizedAdmin
+    )]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [GlobalConfig::SEED],
+        bump = config.bump,
+    )]
+    pub config: Account<'info, GlobalConfig>,
+
+    #[account(
+        mut,
+        seeds = [PresalePool::SEED, pool.mint.as_ref()],
+        bump = pool.bump,
+    )]
+    pub pool: Account<'info, PresalePool>,
+}
+
+pub fn handle_unpause_presale_pool(ctx: Context<UnpausePresalePool>) -> Result<()> {
+    ctx.accounts.pool.is_paused = false;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn bonding_pool_pause_toggle_updates_state() {
+        let mut paused = true;
+        assert!(paused);
+
+        paused = false;
+        assert!(!paused);
+    }
+
+    #[test]
+    fn presale_pool_pause_toggle_updates_state() {
         let mut paused = true;
         assert!(paused);
 

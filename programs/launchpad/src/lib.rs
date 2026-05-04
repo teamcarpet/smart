@@ -57,6 +57,14 @@ pub mod launchpad {
         instructions::handle_unpause_bonding_pool(ctx)
     }
 
+    pub fn pause_presale_pool(ctx: Context<PausePresalePool>) -> Result<()> {
+        instructions::handle_pause_presale_pool(ctx)
+    }
+
+    pub fn unpause_presale_pool(ctx: Context<UnpausePresalePool>) -> Result<()> {
+        instructions::handle_unpause_presale_pool(ctx)
+    }
+
     // ── Bonding Curve ───────────────────────────────────────────────────
 
     pub fn create_bonding_pool(

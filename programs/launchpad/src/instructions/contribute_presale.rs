@@ -4,7 +4,7 @@ use anchor_lang::system_program;
 use crate::errors::LaunchpadError;
 use crate::events::PresaleContribution;
 use crate::math::fees;
-use crate::state::{GlobalConfig, PresalePool, UserPosition};
+use crate::state::{require_presale_pool_active, GlobalConfig, PresalePool, UserPosition};
 
 #[derive(Accounts)]
 pub struct ContributePresale<'info> {
@@ -23,6 +23,7 @@ pub struct ContributePresale<'info> {
         seeds = [PresalePool::SEED, pool.mint.as_ref()],
         bump = pool.bump,
         constraint = !pool.is_migrated @ LaunchpadError::AlreadyMigrated,
+        constraint = !pool.is_paused @ LaunchpadError::PoolPaused,
     )]
     pub pool: Account<'info, PresalePool>,
 
@@ -59,6 +60,8 @@ pub fn handle_contribute_presale(ctx: Context<ContributePresale>, sol_amount: u6
     require!(sol_amount > 0, LaunchpadError::ZeroAmount);
 
     let pool = &ctx.accounts.pool;
+
+    require_presale_pool_active(pool.is_paused)?;
 
     // ── CHECKS ──────────────────────────────────────────────────────
 

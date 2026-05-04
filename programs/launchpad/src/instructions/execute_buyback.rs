@@ -20,7 +20,7 @@ pub const BUYBACK_TOKEN_VAULT_SEED: &[u8] = b"buyback_token_vault";
 
 #[derive(Accounts)]
 pub struct ExecuteBuyback<'info> {
-    /// Anyone can trigger buyback (permissionless crank)
+    /// Configured keeper wallet only
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -28,7 +28,7 @@ pub struct ExecuteBuyback<'info> {
         seeds = [GlobalConfig::SEED],
         bump = config.bump,
         constraint = !config.is_paused @ LaunchpadError::PlatformPaused,
-        constraint = payer.key() == config.keeper_wallet @ LaunchpadError::UnauthorizedAdmin,
+        constraint = payer.key() == config.keeper_wallet @ LaunchpadError::UnauthorizedKeeper,
     )]
     pub config: Box<Account<'info, GlobalConfig>>,
 
@@ -129,14 +129,12 @@ pub fn handle_execute_buyback(
 
     // ── CHECKS ──────────────────────────────────────────────────────
 
-    require!(
-        params.min_tokens_out > 0,
-        LaunchpadError::InvalidMinTokensOut
-    );
-    require!(
-        buyback_caller_is_authorized(ctx.accounts.payer.key(), ctx.accounts.config.keeper_wallet),
-        LaunchpadError::UnauthorizedAdmin
-    );
+    validate_buyback_execution(
+        ctx.accounts.config.is_paused,
+        ctx.accounts.payer.key(),
+        ctx.accounts.config.keeper_wallet,
+        params.min_tokens_out,
+    )?;
 
     require!(
         buyback.pool_type == 0 || buyback.pool_type == 1,
@@ -148,9 +146,9 @@ pub fn handle_execute_buyback(
 
     // Compute SOL to spend + gating — different logic per pool type.
     //
-    // BONDING (pool_type == 0): legacy slot-based cooldown, 20% of remaining
-    //   treasury each call. Anyone can crank whenever MIN_BUYBACK_INTERVAL
-    //   slots have passed.
+    // BONDING (pool_type == 0): slot-based cooldown, fixed
+    //   BONDING_BUYBACK_BPS of initial_treasury each call, capped by
+    //   remaining treasury_balance.
     //
     // PRESALE (pool_type == 1): scheduled rounds. Each pool is created with
     //   either Regular (6 × 10% / 4h) or Extreme (12 × 5% / 30min). Each
@@ -171,14 +169,7 @@ pub fn handle_execute_buyback(
             );
         }
 
-        let amount: u128 = (buyback.initial_treasury as u128)
-            .checked_mul(BuybackState::BONDING_BUYBACK_BPS as u128)
-            .ok_or(LaunchpadError::MathOverflow)?
-            .checked_div(10_000u128)
-            .ok_or(LaunchpadError::DivisionByZero)?;
-        u64::try_from(amount)
-            .map_err(|_| LaunchpadError::CastOverflow)?
-            .min(buyback.treasury_balance)
+        calculate_bonding_buyback_spend(buyback.initial_treasury, buyback.treasury_balance)?
     } else {
         // Presale: scheduled round check
         require!(
@@ -404,6 +395,31 @@ fn buyback_caller_is_authorized(payer: Pubkey, keeper_wallet: Pubkey) -> bool {
     payer == keeper_wallet
 }
 
+fn validate_buyback_execution(
+    is_paused: bool,
+    payer: Pubkey,
+    keeper_wallet: Pubkey,
+    min_tokens_out: u64,
+) -> Result<()> {
+    require!(!is_paused, LaunchpadError::PlatformPaused);
+    require!(min_tokens_out > 0, LaunchpadError::InvalidMinTokensOut);
+    require!(
+        buyback_caller_is_authorized(payer, keeper_wallet),
+        LaunchpadError::UnauthorizedKeeper
+    );
+    Ok(())
+}
+
+fn calculate_bonding_buyback_spend(initial_treasury: u64, treasury_balance: u64) -> Result<u64> {
+    let amount: u128 = (initial_treasury as u128)
+        .checked_mul(BuybackState::BONDING_BUYBACK_BPS as u128)
+        .ok_or(LaunchpadError::MathOverflow)?
+        .checked_div(10_000u128)
+        .ok_or(LaunchpadError::DivisionByZero)?;
+    let amount = u64::try_from(amount).map_err(|_| LaunchpadError::CastOverflow)?;
+    Ok(amount.min(treasury_balance))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn validate_buyback_accounts(
     program_id: &Pubkey,
@@ -530,7 +546,27 @@ mod tests {
     #[test]
     fn execute_buyback_requires_keeper_wallet() {
         let keeper = crate::state::KEEPER_WALLET;
-        assert!(buyback_caller_is_authorized(keeper, keeper));
-        assert!(!buyback_caller_is_authorized(Pubkey::new_unique(), keeper));
+        assert!(validate_buyback_execution(false, keeper, keeper, 1).is_ok());
+        assert!(validate_buyback_execution(false, Pubkey::new_unique(), keeper, 1).is_err());
+    }
+
+    #[test]
+    fn execute_buyback_rejects_when_platform_paused() {
+        let keeper = crate::state::KEEPER_WALLET;
+        assert!(validate_buyback_execution(true, keeper, keeper, 1).is_err());
+    }
+
+    #[test]
+    fn bonding_buyback_uses_initial_treasury_and_caps_by_remaining_balance() {
+        let spend = calculate_bonding_buyback_spend(1_000_000_000, 5_000_000).unwrap();
+        assert_eq!(spend, 5_000_000);
+    }
+
+    #[test]
+    fn buyback_mode_has_no_stale_add_liquidity_branch() {
+        let mode = BuybackMode::Burn;
+        match mode {
+            BuybackMode::Burn => {}
+        }
     }
 }

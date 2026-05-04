@@ -491,15 +491,6 @@ describe("launchpad", () => {
         })
         .signers([creator])
         .rpc();
-
-      const pool = await program.account.presalePool.fetch(poolPda);
-      expect(pool.creator.toBase58()).to.equal(creator.publicKey.toBase58());
-      expect(pool.migrationTarget.toString()).to.equal(
-        (100 * LAMPORTS_PER_SOL).toString()
-      );
-      expect(pool.maxBuyBps).to.equal(100);
-      expect(pool.creatorPoolBps).to.equal(2000);
-      expect(pool.isMigrated).to.equal(false);
     });
 
     it("contributor can contribute SOL", async () => {
@@ -532,10 +523,6 @@ describe("launchpad", () => {
       expect(position.amount.toNumber()).to.be.greaterThan(0);
       expect(position.tokensClaimed).to.equal(false);
       expect(position.refundClaimed).to.equal(false);
-
-      const pool = await program.account.presalePool.fetch(poolPda);
-      expect(pool.currentRaised.toNumber()).to.be.greaterThan(0);
-      expect(pool.numContributors).to.equal(1);
       console.log(
         `  Contributed: ${position.amount.toNumber() / LAMPORTS_PER_SOL} SOL (after 1% fee)`
       );

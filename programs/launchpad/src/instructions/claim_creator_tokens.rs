@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::errors::LaunchpadError;
-use crate::state::{BuybackState, GlobalConfig, PresalePool};
+use crate::state::{require_presale_pool_active, BuybackState, GlobalConfig, PresalePool};
 
 #[derive(Accounts)]
 pub struct ClaimCreatorTokens<'info> {
@@ -20,6 +20,7 @@ pub struct ClaimCreatorTokens<'info> {
         bump = pool.bump,
         constraint = pool.creator == creator.key() @ LaunchpadError::UnauthorizedCreator,
         constraint = pool.is_migrated @ LaunchpadError::NotMigrated,
+        constraint = !pool.is_paused @ LaunchpadError::PoolPaused,
     )]
     pub pool: Account<'info, PresalePool>,
 
@@ -52,6 +53,8 @@ pub struct ClaimCreatorTokens<'info> {
 }
 
 pub fn handle_claim_creator_tokens(ctx: Context<ClaimCreatorTokens>) -> Result<()> {
+    require_presale_pool_active(ctx.accounts.pool.is_paused)?;
+
     let allocation = ctx.accounts.buyback_state.creator_token_allocation;
     let already_claimed = ctx.accounts.buyback_state.creator_tokens_claimed;
     let claimable = allocation

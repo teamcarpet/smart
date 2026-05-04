@@ -25,6 +25,9 @@ pub enum LaunchpadError {
     #[msg("Unauthorized: not pool creator")]
     UnauthorizedCreator,
 
+    #[msg("Unauthorized: not keeper wallet")]
+    UnauthorizedKeeper,
+
     // ── Pool state ──────────────────────────────────────────────────
     #[msg("Platform is paused")]
     PlatformPaused,
